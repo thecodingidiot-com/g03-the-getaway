@@ -53,9 +53,14 @@ r01/r02 already built.
 - A real altitude axis: climbing above `OBSTACLE_HEIGHT` clears every
   obstacle on the course, the actual dodge Space Harrier's own up/down
   stick is for. A direct positional step, not ramped like throttle.
-- A visible player craft drawn at a fixed screen position, and
-  scattered background decoration reusing the same projection — same
-  technique, applied to feel and readability instead of new math.
+- A visible player craft drawn at a fixed screen position, banking
+  left/right around its own centre as it steers, and scattered
+  background decoration reusing the same projection — same technique,
+  applied to feel and readability instead of new math.
+- A third way through the course: Ctrl fires a shot that destroys the
+  first obstacle it reaches. A destroyed obstacle stops colliding and
+  stops rendering; `road_reset()` restores every one of them for the
+  next run, the same reason `camera_init()` resets position.
 - No score, no HUD, no audio — outcomes print to the terminal and the
   run restarts. Art and sound are a later part of this curriculum, not
   this chapter's job.
@@ -68,11 +73,13 @@ Source is split by concern, one file per module:
 | `vec2.c` / `vec2.h` | a small 2D vector type: add, subtract, scale, dot (unchanged from r01/r02) |
 | `camera.c` / `camera.h` | position, facing angle, and the derived `forward`/`right` axes (unchanged from r01/r02) — no SDL2 anywhere |
 | `scaler.c` / `scaler.h` | world position → screen projection (unchanged from r01/r02) — no SDL2 anywhere |
-| `road.c` / `road.h` | load the road file, collision and finish checks — no SDL2 anywhere |
+| `road.c` / `road.h` | load the road file, collision/finish/shot-hit checks — no SDL2 anywhere |
+| `shot.c` / `shot.h` | a generic projectile pool — fire, advance, age out — knows nothing about obstacles at all, no SDL2 anywhere |
 | `render.c` / `render.h` | the only file that calls actual SDL2 drawing functions |
 
-`vec2.c`, `camera.c`, `scaler.c`, and `road.c` never call an SDL2
-function, so they link into a test binary with no SDL2 library at all.
+`vec2.c`, `camera.c`, `scaler.c`, `road.c`, and `shot.c` never call an
+SDL2 function, so they link into a test binary with no SDL2 library at
+all.
 
 Build and test your own version first. Use `solution/` to compare
 once you are done, not before.
@@ -92,7 +99,7 @@ make re
 Controls: Left/Right arrows or `h`/`l` to steer (a direct sideways
 shift, not a turn — the camera always faces forward), Up/Down arrows
 or `k`/`j` to climb/descend, Space to accelerate, Shift to brake,
-Escape or `q` to quit.
+Ctrl to fire, Escape or `q` to quit.
 
 `gen_assets.sh` needs Python3 + Pillow:
 
@@ -106,9 +113,9 @@ sudo apt install python3-pil
 
 **Build** — the real game compiles and links with zero warnings.
 
-**A standalone logic tester** — `vec2.o`, `camera.o`, `scaler.o`, and
-`road.o` compiled and linked with `libtci.a` alone, no SDL2 at all,
-asserting real outcomes against `fixtures/road1.txt`:
+**A standalone logic tester** — `vec2.o`, `camera.o`, `scaler.o`,
+`road.o`, and `shot.o` compiled and linked with `libtci.a` alone, no
+SDL2 at all, asserting real outcomes against `fixtures/road1.txt`:
 
 - The road file parses to the right obstacle count and finish
   distance.
@@ -118,12 +125,17 @@ asserting real outcomes against `fixtures/road1.txt`:
 - Flying at or above `OBSTACLE_HEIGHT` clears an obstacle that would
   otherwise be a certain collision; just under that height still
   isn't enough.
+- A shot that reaches an obstacle destroys it and deactivates itself;
+  a destroyed obstacle stops colliding; `road_reset()` restores it.
+- A shot fired from above `OBSTACLE_HEIGHT` flies over an obstacle,
+  same as the player would.
 - Reaching the finish distance wins the run; short of it does not.
 
 **`getaway`** — runs its event loop for two seconds under a headless
 (`SDL_VIDEODRIVER=dummy`) video driver without crashing. A smoke test,
 not a visual check — actually driving the road, dodging obstacles by
-steering or altitude, is done by running it yourself.
+steering, altitude, or shooting them down, is done by running it
+yourself.
 
 ---
 
