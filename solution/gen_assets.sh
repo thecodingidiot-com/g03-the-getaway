@@ -1,12 +1,13 @@
 #!/bin/bash
-# Generate placeholder obstacle sprites for g03.
+# Generate placeholder sprites for g03.
 #
-# cone.png: an orange traffic cone, transparent background.
-# barrier.png: a red-and-white striped barrier, transparent background.
+# rock.png / pillar.png: obstacles to dodge, transparent background.
+# marker.png: small background decoration, never checked for collision.
+# player.png: the player's own craft, drawn at a fixed screen position.
 #
-# Both are drawn at a fixed 128x128 so render.c's SDL_RenderCopy(...,
-# NULL, &dst) always samples the whole texture -- the scaling happens
-# entirely in the destination rect, not the source, same as r01/r02.
+# All drawn at a fixed 128x128 (player.png at 128x80) so render.c's
+# SDL_RenderCopy(..., NULL, &dst) always samples the whole texture --
+# the scaling happens entirely in the destination rect, same as r01/r02.
 
 set -e
 
@@ -17,35 +18,54 @@ from PIL import Image, ImageDraw
 
 SIZE = 128
 
-cone = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-d = ImageDraw.Draw(cone)
-d.rectangle([SIZE // 2 - 44, SIZE - 16, SIZE // 2 + 44, SIZE], fill=(0x3a, 0x3a, 0x3a, 255))
+rock = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+d = ImageDraw.Draw(rock)
 d.polygon(
-    [(SIZE // 2, 8), (SIZE // 2 + 34, SIZE - 16), (SIZE // 2 - 34, SIZE - 16)],
-    fill=(0xe8, 0x6a, 0x1a, 255),
+    [
+        (18, SIZE - 10), (8, SIZE - 55), (34, SIZE - 100),
+        (SIZE - 30, SIZE - 104), (SIZE - 10, SIZE - 58), (SIZE - 20, SIZE - 10),
+    ],
+    fill=(0x7a, 0x6a, 0x5a, 255),
 )
-d.polygon(
-    [(SIZE // 2 - 20, SIZE - 46), (SIZE // 2 + 20, SIZE - 46),
-     (SIZE // 2 + 26, SIZE - 32), (SIZE // 2 - 26, SIZE - 32)],
-    fill=(0xf5, 0xf5, 0xf5, 255),
-)
-cone.save("assets/cone.png")
-print("  wrote assets/cone.png")
+rock.save("assets/rock.png")
+print("  wrote assets/rock.png")
 
-barrier = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-d = ImageDraw.Draw(barrier)
-d.rectangle([8, SIZE - 90, SIZE - 8, SIZE - 30], fill=(0xf5, 0xf5, 0xf5, 255))
-stripe_w = 16
-x = 8
-flip = False
-while x < SIZE - 8:
-    w = min(stripe_w, SIZE - 8 - x)
-    if flip:
-        d.rectangle([x, SIZE - 90, x + w, SIZE - 30], fill=(0xc8, 0x1e, 0x1e, 255))
-    x += w
-    flip = not flip
-d.rectangle([16, SIZE - 30, 26, SIZE], fill=(0x3a, 0x3a, 0x3a, 255))
-d.rectangle([SIZE - 26, SIZE - 30, SIZE - 16, SIZE], fill=(0x3a, 0x3a, 0x3a, 255))
-barrier.save("assets/barrier.png")
-print("  wrote assets/barrier.png")
+pillar = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+d = ImageDraw.Draw(pillar)
+d.rectangle([SIZE // 2 - 22, 10, SIZE // 2 + 22, SIZE - 6], fill=(0xa8, 0x9a, 0x7a, 255))
+d.rectangle([SIZE // 2 - 30, SIZE - 22, SIZE // 2 + 30, SIZE - 6], fill=(0x8a, 0x7a, 0x5e, 255))
+d.rectangle([SIZE // 2 - 26, 4, SIZE // 2 + 26, 18], fill=(0x8a, 0x7a, 0x5e, 255))
+pillar.save("assets/pillar.png")
+print("  wrote assets/pillar.png")
+
+marker = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+d = ImageDraw.Draw(marker)
+d.ellipse([SIZE // 2 - 30, SIZE - 40, SIZE // 2 + 30, SIZE - 4], fill=(0x2e, 0x5a, 0x2e, 255))
+d.ellipse([SIZE // 2 - 14, SIZE - 60, SIZE // 2 + 14, SIZE - 24], fill=(0x3e, 0x74, 0x3e, 255))
+marker.save("assets/marker.png")
+print("  wrote assets/marker.png")
+
+PLAYER_W, PLAYER_H = 128, 80
+player = Image.new("RGBA", (PLAYER_W, PLAYER_H), (0, 0, 0, 0))
+d = ImageDraw.Draw(player)
+d.polygon(
+    [(4, PLAYER_H // 2), (PLAYER_W // 2 - 6, PLAYER_H // 2 - 8),
+     (PLAYER_W // 2 - 6, PLAYER_H // 2 + 8)],
+    fill=(0xd0, 0x2a, 0x2a, 255),
+)
+d.polygon(
+    [(PLAYER_W - 4, PLAYER_H // 2), (PLAYER_W // 2 + 6, PLAYER_H // 2 - 8),
+     (PLAYER_W // 2 + 6, PLAYER_H // 2 + 8)],
+    fill=(0xd0, 0x2a, 0x2a, 255),
+)
+d.ellipse(
+    [PLAYER_W // 2 - 16, PLAYER_H // 2 - 14, PLAYER_W // 2 + 16, PLAYER_H // 2 + 14],
+    fill=(0xf0, 0xf0, 0xf0, 255),
+)
+d.ellipse(
+    [PLAYER_W // 2 - 7, PLAYER_H // 2 - 7, PLAYER_W // 2 + 7, PLAYER_H // 2 + 7],
+    fill=(0x2a, 0x2a, 0xd0, 255),
+)
+player.save("assets/player.png")
+print("  wrote assets/player.png")
 EOF
