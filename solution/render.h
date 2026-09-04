@@ -2,6 +2,7 @@
 # define RENDER_H
 
 # include <SDL2/SDL.h>
+# include <SDL2/SDL_ttf.h>
 # include "map.h"
 # include "camera.h"
 
@@ -30,5 +31,9 @@ void    render_shots(t_shot const shots[MAX_SHOTS], t_camera const *cam,
             SDL_Renderer *ren, SDL_Texture *shot_tex);
 void    render_player(SDL_Renderer *ren, SDL_Texture *player_tex,
             float cam_height, float tilt);
+void    render_hud(SDL_Renderer *ren, TTF_Font *font, int lives,
+            int elapsed_seconds);
+void    render_game_over(SDL_Renderer *ren, TTF_Font *font,
+            int elapsed_seconds);
 
 #endif
