@@ -4,6 +4,7 @@
 # include "vec2.h"
 # include "camera.h"
 # include "shot.h"
+# include "event.h"
 
 # define MAX_OBSTACLES      64
 # define COLLISION_DIST     1.2f
@@ -12,13 +13,6 @@
 # define MAX_HEIGHT         3.5f
 # define MIN_SIDE           -6.0f
 # define MAX_SIDE           6.0f
-
-typedef enum e_event
-{
-    EVENT_NONE,
-    EVENT_DIED,
-    EVENT_WON
-}   t_event;
 
 typedef struct s_obstacle
 {

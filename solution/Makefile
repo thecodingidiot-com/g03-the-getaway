@@ -1,7 +1,7 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -Werror -D_REENTRANT -I libtci
-LDFLAGS = $(shell sdl2-config --libs) -lSDL2_image -lm
-SRCS    = main.c vec2.c camera.c scaler.c map.c shot.c render.c
+LDFLAGS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_mixer -lm
+SRCS    = main.c vec2.c camera.c scaler.c map.c shot.c render.c audio.c
 OBJS    = $(SRCS:.c=.o)
 LIBS    = libtci/libtci.a
 NAME    = getaway
