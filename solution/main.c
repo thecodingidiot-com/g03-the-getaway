@@ -13,6 +13,8 @@
 #define ACCEL           0.025f
 #define BRAKE           0.05f
 #define DECEL           0.015f
+#define MAX_TILT_DEG    25.0f
+#define TILT_EASE       0.2f
 
 /* Hang-On/Out Run/Space Harrier never rotate the camera -- steering
 ** shifts world position directly, so the road (or the open ground
@@ -21,13 +23,26 @@
 ** which is the raycaster's steering model (r03 rotates and moves
 ** forward), not this one -- caught by actually playing it, not by
 ** reading the code. `cam->right` never changes once `camera_turn()`
-** is never called, so this is a plain vector add, not a rotation. */
-static void handle_steering(t_camera *cam, Uint8 const *keys)
+** is never called, so this is a plain vector add, not a rotation.
+**
+** `*tilt` is purely cosmetic on top of that -- it never touches
+** `cam->pos`, only how the player's own sprite gets drawn. It eases
+** toward a target instead of snapping to it, the same reason a real
+** plane's bank angle lags the stick instead of matching it instantly. */
+static void handle_steering(t_camera *cam, float *tilt, Uint8 const *keys)
 {
-    if (keys[SDL_SCANCODE_LEFT] || keys[SDL_SCANCODE_H])
+    float   target;
+
+    target = 0.0f;
+    if (keys[SDL_SCANCODE_LEFT] || keys[SDL_SCANCODE_H]) {
         cam->pos = vec2_add(cam->pos, vec2_scale(cam->right, -STRAFE_SPEED));
-    if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_L])
+        target = MAX_TILT_DEG;
+    }
+    if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_L]) {
         cam->pos = vec2_add(cam->pos, vec2_scale(cam->right, STRAFE_SPEED));
+        target = -MAX_TILT_DEG;
+    }
+    *tilt += (target - *tilt) * TILT_EASE;
 }
 
 /* Space Harrier's other axis -- up/down never touched the camera at
@@ -74,7 +89,7 @@ static void handle_throttle(float *speed, Uint8 const *keys)
 }
 
 static void handle_terminal_event(t_camera *cam, float *speed,
-        float *cam_height, t_event event, int *runs)
+        float *cam_height, float *tilt, t_event event, int *runs)
 {
     if (event == EVENT_NONE)
         return ;
@@ -86,6 +101,7 @@ static void handle_terminal_event(t_camera *cam, float *speed,
     camera_init(cam, 0.0f, 0.0f, 0.0f);
     *speed = 0.0f;
     *cam_height = 0.0f;
+    *tilt = 0.0f;
 }
 
 int main(int argc, char **argv)
@@ -103,6 +119,7 @@ int main(int argc, char **argv)
     int             runs;
     float           speed;
     float           cam_height;
+    float           tilt;
 
     if (argc < 2) {
         tci_printf("usage: %s <road_file>\n", argv[0]);
@@ -132,6 +149,7 @@ int main(int argc, char **argv)
     camera_init(&cam, 0.0f, 0.0f, 0.0f);
     speed = 0.0f;
     cam_height = 0.0f;
+    tilt = 0.0f;
     runs = 1;
     running = 1;
     while (running) {
@@ -143,18 +161,18 @@ int main(int argc, char **argv)
                 running = 0;
         }
         keys = SDL_GetKeyboardState(NULL);
-        handle_steering(&cam, keys);
+        handle_steering(&cam, &tilt, keys);
         handle_altitude(&cam_height, keys);
         handle_throttle(&speed, keys);
         camera_move(&cam, speed);
-        handle_terminal_event(&cam, &speed, &cam_height,
+        handle_terminal_event(&cam, &speed, &cam_height, &tilt,
             road_check_collision(&road, &cam, cam_height), &runs);
-        handle_terminal_event(&cam, &speed, &cam_height,
+        handle_terminal_event(&cam, &speed, &cam_height, &tilt,
             road_check_finish(&road, &cam), &runs);
         render_backdrop(ren);
         render_markers(&cam, cam_height, ren, marker_tex);
         render_road(&road, &cam, cam_height, ren, sprites);
-        render_player(ren, player_tex, cam_height);
+        render_player(ren, player_tex, cam_height, tilt);
         SDL_RenderPresent(ren);
         SDL_Delay(16);
     }

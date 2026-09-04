@@ -153,11 +153,13 @@ void    render_markers(t_camera const *cam, float cam_height,
 /* No projection at all -- the player's own craft sits at a fixed
 ** horizontal point on screen every frame, the same way the dashboard
 ** in an Out Run cabinet never moves while the road does. Altitude is
-** the one exception: it moves the craft itself, in real pixels, not
-** anything projected -- Space Harrier's own on-screen character does
-** exactly this, no depth involved at all. */
+** one exception: it moves the craft itself, in real pixels, not
+** anything projected. Tilt is the other -- `SDL_RenderCopyEx()`
+** instead of `SDL_RenderCopy()`, rotating the same texture around its
+** own centre rather than moving it, the way a plane banks into a turn
+** instead of sliding sideways rigid. */
 void    render_player(SDL_Renderer *ren, SDL_Texture *player_tex,
-        float cam_height)
+        float cam_height, float tilt)
 {
     SDL_Rect    dst;
 
@@ -165,5 +167,6 @@ void    render_player(SDL_Renderer *ren, SDL_Texture *player_tex,
     dst.h = PLAYER_SPRITE_H;
     dst.x = WINDOW_W / 2 - dst.w / 2;
     dst.y = WINDOW_H - dst.h - 24 - (int)(cam_height * PLAYER_PX_PER_UNIT);
-    SDL_RenderCopy(ren, player_tex, NULL, &dst);
+    SDL_RenderCopyEx(ren, player_tex, NULL, &dst, (double)tilt, NULL,
+        SDL_FLIP_NONE);
 }
