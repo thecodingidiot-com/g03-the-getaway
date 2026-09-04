@@ -6,28 +6,39 @@
 #include "road.h"
 #include "render.h"
 
-#define TURN_SPEED  0.035f
-#define MAX_SPEED   1.1f
-#define MIN_SPEED   -0.4f
-#define ACCEL       0.025f
-#define BRAKE       0.05f
-#define DECEL       0.015f
+#define STRAFE_SPEED    0.3f
+#define MAX_SPEED       1.1f
+#define MIN_SPEED       -0.4f
+#define ACCEL           0.025f
+#define BRAKE           0.05f
+#define DECEL           0.015f
 
-/* Same steering convention r01/r02 established, unchanged: RIGHT/L is
-** the negative angle delta, LEFT/H the positive one. Forward/back are
-** no longer a fixed speed -- holding a direction ramps toward it,
-** letting go decays back toward a stop instead of snapping there. */
-static void handle_input(t_camera *cam, float *speed, Uint8 const *keys)
+/* Hang-On/Out Run/Space Harrier never rotate the camera -- steering
+** shifts world position directly, so the road (or the open ground
+** here) slides sideways under a craft that keeps facing forward. The
+** first version of this file called camera_turn() for left/right,
+** which is the raycaster's steering model (r03 rotates and moves
+** forward), not this one -- caught by actually playing it, not by
+** reading the code. `cam->right` never changes once `camera_turn()`
+** is never called, so this is a plain vector add, not a rotation. */
+static void handle_steering(t_camera *cam, Uint8 const *keys)
 {
     if (keys[SDL_SCANCODE_LEFT] || keys[SDL_SCANCODE_H])
-        camera_turn(cam, TURN_SPEED);
+        cam->pos = vec2_add(cam->pos, vec2_scale(cam->right, -STRAFE_SPEED));
     if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_L])
-        camera_turn(cam, -TURN_SPEED);
-    if (keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_K]) {
+        cam->pos = vec2_add(cam->pos, vec2_scale(cam->right, STRAFE_SPEED));
+}
+
+/* Acceleration/braking on their own keys now, not sharing the d-pad
+** with steering -- separate controls in every one of the cabinets
+** this chapter is named after, not one stick doing both jobs. */
+static void handle_throttle(float *speed, Uint8 const *keys)
+{
+    if (keys[SDL_SCANCODE_SPACE]) {
         *speed += ACCEL;
         if (*speed > MAX_SPEED)
             *speed = MAX_SPEED;
-    } else if (keys[SDL_SCANCODE_DOWN] || keys[SDL_SCANCODE_J]) {
+    } else if (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) {
         *speed -= BRAKE;
         if (*speed < MIN_SPEED)
             *speed = MIN_SPEED;
@@ -40,7 +51,6 @@ static void handle_input(t_camera *cam, float *speed, Uint8 const *keys)
         if (*speed > 0.0f)
             *speed = 0.0f;
     }
-    camera_move(cam, *speed);
 }
 
 static void handle_terminal_event(t_camera *cam, float *speed,
@@ -110,7 +120,9 @@ int main(int argc, char **argv)
                 running = 0;
         }
         keys = SDL_GetKeyboardState(NULL);
-        handle_input(&cam, &speed, keys);
+        handle_steering(&cam, keys);
+        handle_throttle(&speed, keys);
+        camera_move(&cam, speed);
         handle_terminal_event(&cam, &speed,
             road_check_collision(&road, &cam), &runs);
         handle_terminal_event(&cam, &speed,
