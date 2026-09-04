@@ -260,3 +260,110 @@ void    render_player(SDL_Renderer *ren, SDL_Texture *player_tex,
     SDL_RenderCopyEx(ren, player_tex, NULL, &dst, (double)tilt, NULL,
         SDL_FLIP_NONE);
 }
+
+/* The only text this chapter ever draws, and the only place SDL2_ttf
+** gets called -- same one-file boundary render.c already keeps for
+** every other SDL2 drawing call. A fresh texture per string per frame
+** is exactly what g01b's own font.c already does; a HUD that's two
+** short lines a frame doesn't need caching to stay honest about cost. */
+static void draw_string(SDL_Renderer *ren, TTF_Font *font, int x, int y,
+        char const *s)
+{
+    SDL_Color       white;
+    SDL_Surface     *surf;
+    SDL_Texture     *tex;
+    SDL_Rect        dst;
+
+    white.r = 255;
+    white.g = 255;
+    white.b = 255;
+    white.a = 255;
+    surf = TTF_RenderUTF8_Solid(font, s, white);
+    if (!surf)
+        return ;
+    tex = SDL_CreateTextureFromSurface(ren, surf);
+    SDL_FreeSurface(surf);
+    if (!tex)
+        return ;
+    dst.x = x;
+    dst.y = y;
+    SDL_QueryTexture(tex, NULL, NULL, &dst.w, &dst.h);
+    SDL_RenderCopy(ren, tex, NULL, &dst);
+    SDL_DestroyTexture(tex);
+}
+
+/* No tci_itoa in libtci -- this reaches for libc nowhere else in this
+** function, only a plain digit-by-digit loop the same shape every
+** c-tier ft_putnbr already used, reversed into place once the count
+** of digits is known. */
+static void int_to_str(int n, char *buf)
+{
+    char    tmp[12];
+    int     i;
+    int     j;
+
+    i = 0;
+    if (n == 0)
+        tmp[i++] = '0';
+    while (n > 0) {
+        tmp[i++] = '0' + n % 10;
+        n /= 10;
+    }
+    j = 0;
+    while (i > 0)
+        buf[j++] = tmp[--i];
+    buf[j] = '\0';
+}
+
+static void format_hud_line(char *out, char const *prefix, int n,
+        char const *suffix)
+{
+    char    num[12];
+    int     i;
+    int     j;
+
+    i = 0;
+    while (prefix[i]) {
+        out[i] = prefix[i];
+        i++;
+    }
+    int_to_str(n, num);
+    j = 0;
+    while (num[j])
+        out[i++] = num[j++];
+    j = 0;
+    while (suffix[j])
+        out[i++] = suffix[j++];
+    out[i] = '\0';
+}
+
+/* Lives top-left, the timer the arcade brief actually asked for top
+** right -- drawn every frame regardless of game_over, so the last
+** thing on screen before a game over is the true final time, not a
+** frozen guess. */
+void    render_hud(SDL_Renderer *ren, TTF_Font *font, int lives,
+        int elapsed_seconds)
+{
+    char    lives_str[32];
+    char    time_str[32];
+
+    format_hud_line(lives_str, "LIVES: ", lives, "");
+    format_hud_line(time_str, "TIME: ", elapsed_seconds, "s");
+    draw_string(ren, font, 16, 12, lives_str);
+    draw_string(ren, font, WINDOW_W - 160, 12, time_str);
+}
+
+/* Drawn on top of the frozen world, not instead of it -- the same
+** arcade convention as a cabinet holding the last frame on screen
+** while it waits for another coin. */
+void    render_game_over(SDL_Renderer *ren, TTF_Font *font,
+        int elapsed_seconds)
+{
+    char    survived[32];
+
+    format_hud_line(survived, "SURVIVED ", elapsed_seconds, "s");
+    draw_string(ren, font, WINDOW_W / 2 - 90, WINDOW_H / 2 - 40, "GAME OVER");
+    draw_string(ren, font, WINDOW_W / 2 - 90, WINDOW_H / 2, survived);
+    draw_string(ren, font, WINDOW_W / 2 - 150, WINDOW_H / 2 + 40,
+        "PRESS SPACE FOR ANOTHER COIN");
+}

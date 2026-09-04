@@ -1,6 +1,6 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -Werror -D_REENTRANT -I libtci -MMD -MP
-LDFLAGS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_mixer -lm
+LDFLAGS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lm
 SRCS    = main.c vec2.c camera.c scaler.c map.c shot.c render.c audio.c
 OBJS    = $(SRCS:.c=.o)
 DEPS    = $(OBJS:.o=.d)

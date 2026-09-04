@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 #include "libtci.h"
 #include "camera.h"
 #include "scaler.h"
@@ -13,6 +14,8 @@
 #define VERTICAL_SPEED  0.07f
 #define MAX_TILT_DEG    25.0f
 #define TILT_EASE       0.2f
+#define STARTING_LIVES  3
+#define FONT_SIZE       20
 
 /* Hang-On/Out Run/Space Harrier never rotate the camera -- steering
 ** shifts world position directly, so the ground slides sideways under
@@ -93,20 +96,11 @@ static t_event handle_fire(t_shot shots[MAX_SHOTS], int *cooldown,
     return (EVENT_NONE);
 }
 
-static void handle_terminal_event(t_camera *cam, float *cam_height,
-        float *tilt, t_map *map, t_shot shots[MAX_SHOTS], t_audio const *audio,
-        t_event event, int *runs)
+static void reset_run(t_camera *cam, float *cam_height, float *tilt,
+        t_map *map, t_shot shots[MAX_SHOTS])
 {
     int i;
 
-    audio_play_sfx(audio, event);
-    if (event == EVENT_NONE)
-        return ;
-    if (event == EVENT_DIED)
-        tci_printf("crashed -- run %d over, restarting\n", *runs);
-    else
-        tci_printf("made it -- run %d won, restarting\n", *runs);
-    *runs = *runs + 1;
     camera_init(cam, 0.0f, 0.0f, 0.0f);
     *cam_height = 0.0f;
     *tilt = 0.0f;
@@ -116,6 +110,33 @@ static void handle_terminal_event(t_camera *cam, float *cam_height,
         shots[i].active = 0;
         i++;
     }
+}
+
+/* Collision and finish both used to mean exactly the same thing: this
+** run is over, reset and try again. Arcade mode splits that -- a
+** finish (or the first two collisions) still just resets the run, but
+** the third collision means the run doesn't get reset at all. Returns
+** 1 exactly once, the frame lives actually runs out, so main() can
+** freeze the world instead of calling reset_run() on it. */
+static int  handle_terminal_event(t_camera *cam, float *cam_height,
+        float *tilt, t_map *map, t_shot shots[MAX_SHOTS], t_audio const *audio,
+        t_event event, int *runs, int *lives)
+{
+    audio_play_sfx(audio, event);
+    if (event == EVENT_NONE)
+        return (0);
+    if (event == EVENT_DIED) {
+        tci_printf("crashed -- run %d over, restarting\n", *runs);
+        *lives = *lives - 1;
+        if (*lives <= 0) {
+            tci_printf("out of lives -- game over\n");
+            return (1);
+        }
+    } else
+        tci_printf("made it -- run %d won, restarting\n", *runs);
+    *runs = *runs + 1;
+    reset_run(cam, cam_height, tilt, map, shots);
+    return (0);
 }
 
 int main(int argc, char **argv)
@@ -131,12 +152,17 @@ int main(int argc, char **argv)
     t_camera        cam;
     t_shot          shots[MAX_SHOTS];
     t_audio         audio;
+    TTF_Font        *font;
     Uint8 const     *keys;
     int             running;
     int             runs;
     int             fire_cooldown;
     int             hits;
     int             i;
+    int             lives;
+    int             game_over;
+    int             elapsed_seconds;
+    Uint32          game_start_ticks;
     float           cam_height;
     float           tilt;
 
@@ -172,10 +198,23 @@ int main(int argc, char **argv)
         tci_printf("did you run 'bash gen_audio.sh' first?\n");
         return (1);
     }
+    if (TTF_Init() != 0) {
+        tci_printf("TTF_Init: %s\n", TTF_GetError());
+        return (1);
+    }
+    font = TTF_OpenFont("assets/font.ttf", FONT_SIZE);
+    if (!font) {
+        tci_printf("TTF_OpenFont: %s\n", TTF_GetError());
+        return (1);
+    }
     camera_init(&cam, 0.0f, 0.0f, 0.0f);
     cam_height = 0.0f;
     tilt = 0.0f;
     fire_cooldown = 0;
+    lives = STARTING_LIVES;
+    game_over = 0;
+    game_start_ticks = SDL_GetTicks();
+    elapsed_seconds = 0;
     i = 0;
     while (i < MAX_SHOTS) {
         shots[i].active = 0;
@@ -192,30 +231,50 @@ int main(int argc, char **argv)
                 running = 0;
         }
         keys = SDL_GetKeyboardState(NULL);
-        handle_steering(&cam, &tilt, keys);
-        handle_altitude(&cam_height, keys);
-        audio_play_sfx(&audio,
-            handle_fire(shots, &fire_cooldown, &cam, cam_height, keys));
-        camera_move(&cam, FORWARD_SPEED);
-        shot_update(shots);
-        hits = map_check_shots(&map, shots);
-        while (hits > 0) {
-            audio_play_sfx(&audio, EVENT_HIT);
-            hits--;
+        if (game_over) {
+            if (keys[SDL_SCANCODE_SPACE]) {
+                lives = STARTING_LIVES;
+                game_over = 0;
+                game_start_ticks = SDL_GetTicks();
+                elapsed_seconds = 0;
+                reset_run(&cam, &cam_height, &tilt, &map, shots);
+            }
+        } else {
+            handle_steering(&cam, &tilt, keys);
+            handle_altitude(&cam_height, keys);
+            audio_play_sfx(&audio,
+                handle_fire(shots, &fire_cooldown, &cam, cam_height, keys));
+            camera_move(&cam, FORWARD_SPEED);
+            shot_update(shots);
+            hits = map_check_shots(&map, shots);
+            while (hits > 0) {
+                audio_play_sfx(&audio, EVENT_HIT);
+                hits--;
+            }
+            if (handle_terminal_event(&cam, &cam_height, &tilt, &map, shots,
+                    &audio, map_check_collision(&map, &cam, cam_height),
+                    &runs, &lives))
+                game_over = 1;
+            else
+                handle_terminal_event(&cam, &cam_height, &tilt, &map, shots,
+                    &audio, map_check_finish(&map, &cam), &runs, &lives);
+            elapsed_seconds = (int)((SDL_GetTicks() - game_start_ticks)
+                    / 1000);
         }
-        handle_terminal_event(&cam, &cam_height, &tilt, &map, shots, &audio,
-            map_check_collision(&map, &cam, cam_height), &runs);
-        handle_terminal_event(&cam, &cam_height, &tilt, &map, shots, &audio,
-            map_check_finish(&map, &cam), &runs);
         render_backdrop(ren);
         render_ground_stripes(&cam, ren);
         render_markers(&cam, cam_height, ren, marker_tex);
         render_map(&map, &cam, cam_height, ren, sprites);
         render_shots(shots, &cam, ren, shot_tex);
         render_player(ren, player_tex, cam_height, tilt);
+        render_hud(ren, font, lives, elapsed_seconds);
+        if (game_over)
+            render_game_over(ren, font, elapsed_seconds);
         SDL_RenderPresent(ren);
         SDL_Delay(16);
     }
+    TTF_CloseFont(font);
+    TTF_Quit();
     audio_free(&audio);
     SDL_DestroyTexture(sprites[0]);
     SDL_DestroyTexture(sprites[1]);

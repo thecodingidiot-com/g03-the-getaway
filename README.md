@@ -72,20 +72,28 @@ r01/r02 already built.
   upward — a smaller, honest stand-in for the real cabinet's own
   moving-scanline floor, not a new rendering technique.
 - Three sound effects — a shot, a hit, and a crash — the only audio
-  this chapter adds. No score, no HUD, no music yet; those are still
-  a later part of this curriculum.
+  this chapter adds.
+- An arcade lives system: three collisions and the run doesn't reset
+  again — the world freezes exactly where it crashed, a "GAME OVER"
+  overlay shows how long the run survived, and Space (another coin)
+  starts a fresh game. A finish never costs a life; only a collision
+  does.
+- A HUD showing lives and elapsed time, drawn with SDL2_ttf the same
+  way g01b already draws its own quiz text — a real, attributed
+  TrueType font, not a hand-rolled one. No score yet; that's still a
+  later part of this curriculum.
 
 Source is split by concern, one file per module:
 
 | File | Contents |
 | --- | --- |
-| `main.c` | SDL2 + SDL2_mixer init, the game loop (event → update → render), cleanup |
+| `main.c` | SDL2 + SDL2_mixer + SDL2_ttf init, the game loop (event → update → render), cleanup |
 | `vec2.c` / `vec2.h` | a small 2D vector type: add, subtract, scale, dot (unchanged from r01/r02) |
 | `camera.c` / `camera.h` | position, facing angle, and the derived `forward`/`right` axes (unchanged from r01/r02) — no SDL2 anywhere |
 | `scaler.c` / `scaler.h` | world position → screen projection (unchanged from r01/r02) — no SDL2 anywhere |
 | `map.c` / `map.h` | load the map file, collision/finish/shot-hit checks — no SDL2 anywhere |
 | `shot.c` / `shot.h` | a generic projectile pool — fire, advance, age out — knows nothing about obstacles at all, no SDL2 anywhere |
-| `render.c` / `render.h` | the only file that calls actual SDL2 drawing functions |
+| `render.c` / `render.h` | the only file that calls actual SDL2 (and SDL2_ttf) drawing functions |
 | `audio.c` / `audio.h` | **new** — the only file that calls actual SDL2_mixer functions |
 | `event.h` | **new** — the shared `t_event` enum: `EVENT_FIRED`, `EVENT_HIT`, `EVENT_DIED`, `EVENT_WON` |
 
@@ -114,19 +122,34 @@ shift, not a turn — the camera always faces forward), Up/Down arrows
 or `k`/`j` to climb/descend, Ctrl or `d` to fire (`d` matches the real
 emulator's default), Escape or `q` to quit. Forward speed is constant
 — there's no accelerate/brake key, matching the real game this chapter
-is named after.
+is named after. After the third collision, Space starts a fresh game.
 
 `gen_assets.sh` and `gen_audio.sh` need Python3 + Pillow (stdlib
 `wave` covers the audio synthesis — no extra package):
 
 ```bash
-sudo apt install python3-pil libsdl2-mixer-dev
+sudo apt install python3-pil libsdl2-mixer-dev libsdl2-ttf-dev
 ```
 
 All three sound effects are synthesized locally by `gen_audio.sh` —
 own-work square/sweep waves, not sourced from anywhere — so there is
 nothing to attribute and no license file for `assets/*.wav` beyond
-this repository's own MIT license.
+this repository's own MIT license. `assets/font.ttf` is a real,
+committed asset instead — see attribution below.
+
+---
+
+## Asset attribution
+
+### Font
+
+**Px437 IBM EGA 8×14** by VileR
+Source: [int10h.org — The Ultimate Oldschool PC Font Pack](https://int10h.org/oldschool-pc-fonts/)
+License: [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/)
+
+The font file is `assets/font.ttf` — the TrueType pixel-outline
+variant (`Px437_IBM_EGA_8x14.ttf`) from the v2.2 release, unmodified,
+the same file g01b already carries.
 
 ---
 
@@ -136,7 +159,7 @@ this repository's own MIT license.
 
 **A standalone logic tester** — `vec2.o`, `camera.o`, `scaler.o`,
 `map.o`, and `shot.o` compiled and linked with `libtci.a` alone, no
-SDL2 or SDL2_mixer at all, asserting real outcomes against
+SDL2, SDL2_mixer, or SDL2_ttf at all, asserting real outcomes against
 `fixtures/map1.txt`:
 
 - The map file parses to the right obstacle count and finish

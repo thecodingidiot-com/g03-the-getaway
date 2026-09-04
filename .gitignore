@@ -2,4 +2,5 @@
 *.d
 solution/getaway
 solution/libtci/*.a
-solution/assets/
+solution/assets/*
+!solution/assets/font.ttf
