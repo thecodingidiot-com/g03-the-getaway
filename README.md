@@ -61,10 +61,11 @@ r01/r02 already built.
   left/right around its own centre as it steers, and scattered
   background decoration reusing the same projection — same technique,
   applied to feel and readability instead of new math.
-- A third way through the course: Ctrl fires a shot that destroys the
-  first obstacle it reaches. A destroyed obstacle stops colliding and
-  stops rendering; `map_reset()` restores every one of them for the
-  next run, the same reason `camera_init()` resets position.
+- A third way through the course: Ctrl or `d` fires a shot that
+  destroys the first obstacle it reaches. A destroyed obstacle stops
+  colliding and stops rendering; `map_reset()` restores every one of
+  them for the next run, the same reason `camera_init()` resets
+  position.
 - No score, no HUD, no audio — outcomes print to the terminal and the
   run restarts. Art and sound are a later part of this curriculum, not
   this chapter's job.
@@ -102,9 +103,10 @@ make re
 
 Controls: Left/Right arrows or `h`/`l` to steer (a direct sideways
 shift, not a turn — the camera always faces forward), Up/Down arrows
-or `k`/`j` to climb/descend, Ctrl to fire, Escape or `q` to quit.
-Forward speed is constant — there's no accelerate/brake key, matching
-the real game this chapter is named after.
+or `k`/`j` to climb/descend, Ctrl or `d` to fire (`d` matches the real
+emulator's default), Escape or `q` to quit. Forward speed is constant
+— there's no accelerate/brake key, matching the real game this chapter
+is named after.
 
 `gen_assets.sh` needs Python3 + Pillow:
 

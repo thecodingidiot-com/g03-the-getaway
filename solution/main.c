@@ -68,18 +68,20 @@ static void handle_altitude(float *cam_height, Uint8 const *keys)
     }
 }
 
-/* Ctrl fires, on its own cooldown -- not tied to the frame rate the
-** way a single SDL_KEYDOWN event would be, so holding it down fires
-** repeatedly at a fixed pace instead of once. shot_fire() itself
-** doesn't know or care what's about to fire on it; it just claims the
-** first free slot in the pool. */
+/* Ctrl or D fires, on its own cooldown -- not tied to the frame rate
+** the way a single SDL_KEYDOWN event would be, so holding it down
+** fires repeatedly at a fixed pace instead of once. D matches the
+** real Space Harrier emulator default; Ctrl stays as the more common
+** PC-game fire key. shot_fire() itself doesn't know or care what's
+** about to fire on it; it just claims the first free slot in the
+** pool. */
 static void handle_fire(t_shot shots[MAX_SHOTS], int *cooldown,
         t_camera const *cam, float cam_height, Uint8 const *keys)
 {
     if (*cooldown > 0)
         *cooldown = *cooldown - 1;
-    if ((keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL])
-            && *cooldown == 0) {
+    if ((keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL]
+            || keys[SDL_SCANCODE_D]) && *cooldown == 0) {
         shot_fire(shots, cam->pos, cam_height);
         *cooldown = FIRE_COOLDOWN;
     }
