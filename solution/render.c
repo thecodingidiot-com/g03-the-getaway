@@ -92,12 +92,14 @@ void    render_road(t_road const *road, t_camera const *cam,
     visible = 0;
     i = 0;
     while (i < road->count) {
-        items[visible].proj = scaler_project(cam, road->obstacles[i].pos);
-        items[visible].sprite_id = road->obstacles[i].sprite_id;
-        if (items[visible].proj.visible) {
-            cap_projection(&items[visible].proj);
-            apply_height_shift(&items[visible].proj, cam_height);
-            visible++;
+        if (!road->obstacles[i].destroyed) {
+            items[visible].proj = scaler_project(cam, road->obstacles[i].pos);
+            items[visible].sprite_id = road->obstacles[i].sprite_id;
+            if (items[visible].proj.visible) {
+                cap_projection(&items[visible].proj);
+                apply_height_shift(&items[visible].proj, cam_height);
+                visible++;
+            }
         }
         i++;
     }
@@ -146,6 +148,46 @@ void    render_markers(t_camera const *cam, float cam_height,
         dst.w = shrunk;
         dst.h = shrunk;
         SDL_RenderCopy(ren, marker_tex, NULL, &dst);
+        i++;
+    }
+}
+
+/* Same scaler_project()-then-shrink shape render_markers() already
+** uses, for a completely different reason: markers are shrunk because
+** they're background, shots are shrunk because a bullet is small.
+** Painter's algorithm still applies -- a shot flying past a near
+** obstacle should draw in front of it, same as any other object at
+** that depth. */
+void    render_shots(t_shot const shots[MAX_SHOTS], t_camera const *cam,
+        SDL_Renderer *ren, SDL_Texture *shot_tex)
+{
+    t_draw_item items[MAX_SHOTS];
+    int         visible;
+    int         i;
+    int         shrunk;
+    SDL_Rect    dst;
+
+    visible = 0;
+    i = 0;
+    while (i < MAX_SHOTS) {
+        if (shots[i].active) {
+            items[visible].proj = scaler_project(cam, shots[i].pos);
+            if (items[visible].proj.visible) {
+                cap_projection(&items[visible].proj);
+                visible++;
+            }
+        }
+        i++;
+    }
+    qsort(items, visible, sizeof(items[0]), compare_draw_items);
+    i = 0;
+    while (i < visible) {
+        shrunk = (int)((float)items[i].proj.size * SHOT_SCALE);
+        dst.x = items[i].proj.screen_x + (items[i].proj.size - shrunk) / 2;
+        dst.y = items[i].proj.screen_y + items[i].proj.size - shrunk;
+        dst.w = shrunk;
+        dst.h = shrunk;
+        SDL_RenderCopy(ren, shot_tex, NULL, &dst);
         i++;
     }
 }

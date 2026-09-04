@@ -52,6 +52,7 @@ static int  parse_obstacle_line(int fd, t_obstacle *ob)
     ob->pos.x = (float)tci_atoi(line);
     ob->pos.y = (float)tci_atoi(first_space + 1);
     ob->sprite_id = tci_atoi(second_space + 1);
+    ob->destroyed = 0;
     free(line);
     return (1);
 }
@@ -100,10 +101,12 @@ t_event road_check_collision(t_road const *road, t_camera const *cam,
         return (EVENT_NONE);
     i = 0;
     while (i < road->count) {
-        diff = vec2_sub(cam->pos, road->obstacles[i].pos);
-        dist = sqrtf(diff.x * diff.x + diff.y * diff.y);
-        if (dist < COLLISION_DIST)
-            return (EVENT_DIED);
+        if (!road->obstacles[i].destroyed) {
+            diff = vec2_sub(cam->pos, road->obstacles[i].pos);
+            dist = sqrtf(diff.x * diff.x + diff.y * diff.y);
+            if (dist < COLLISION_DIST)
+                return (EVENT_DIED);
+        }
         i++;
     }
     return (EVENT_NONE);
@@ -117,4 +120,53 @@ t_event road_check_finish(t_road const *road, t_camera const *cam)
     if (dist >= road->finish_dist)
         return (EVENT_WON);
     return (EVENT_NONE);
+}
+
+/* shot.c knows nothing about obstacles -- this is the glue between a
+** generic projectile and this game's own world, the same split
+** road_check_collision() already draws between "distance" (shared
+** idea) and "what counts as a hit" (this game's own rule). A shot
+** that's flying above OBSTACLE_HEIGHT misses everything at ground
+** level for the same reason the player does at that height: nothing
+** here can hit what it's already flying clear over. */
+void    road_check_shots(t_road *road, t_shot shots[MAX_SHOTS])
+{
+    t_vec2  diff;
+    float   dist;
+    int     i;
+    int     j;
+
+    i = 0;
+    while (i < MAX_SHOTS) {
+        if (shots[i].active && shots[i].height < OBSTACLE_HEIGHT) {
+            j = 0;
+            while (j < road->count) {
+                if (!road->obstacles[j].destroyed) {
+                    diff = vec2_sub(shots[i].pos, road->obstacles[j].pos);
+                    dist = sqrtf(diff.x * diff.x + diff.y * diff.y);
+                    if (dist < SHOT_HIT_DIST) {
+                        road->obstacles[j].destroyed = 1;
+                        shots[i].active = 0;
+                    }
+                }
+                j++;
+            }
+        }
+        i++;
+    }
+}
+
+/* Every obstacle destroyed this run comes back for the next one --
+** a restart is a fresh attempt at the same course, the same reason
+** camera_init() puts the camera back at the start instead of wherever
+** it crashed. */
+void    road_reset(t_road *road)
+{
+    int i;
+
+    i = 0;
+    while (i < road->count) {
+        road->obstacles[i].destroyed = 0;
+        i++;
+    }
 }

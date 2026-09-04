@@ -1,10 +1,11 @@
 #!/bin/bash
 # g03 — The Getaway / test.sh
 #
-# Builds the game, then checks the road/collision/finish logic
+# Builds the game, then checks the road/collision/finish/shot logic
 # deterministically -- compiled and linked WITHOUT SDL2 at all (vec2.c,
-# camera.c, scaler.c, and road.c never call an actual SDL function, so
-# the logic layer needs no display and no SDL2 library at link time).
+# camera.c, scaler.c, road.c, and shot.c never call an actual SDL
+# function, so the logic layer needs no display and no SDL2 library at
+# link time).
 #
 # Copy this file and fixtures/road1.txt into your working directory,
 # build with 'make re', then run:
@@ -104,6 +105,7 @@ cat > "$WORK_DIR/test_logic.c" <<'TESTC'
 #include "libtci.h"
 #include "vec2.h"
 #include "camera.h"
+#include "shot.h"
 #include "road.h"
 
 static int  g_pass = 0;
@@ -167,6 +169,71 @@ int main(void)
         road_check_collision(&road, &cam, OBSTACLE_HEIGHT - 0.1f),
         EVENT_DIED);
 
+    /* firing a shot and stepping it forward destroys the obstacle it
+     * reaches -- the same distance check collision already uses,
+     * against a moving point instead of the camera. */
+    {
+        t_shot  shots[MAX_SHOTS];
+        int     j;
+
+        j = 0;
+        while (j < MAX_SHOTS)
+        {
+            shots[j].active = 0;
+            j++;
+        }
+        shot_fire(shots, (t_vec2){0.0f, 0.0f}, 0.0f);
+        j = 0;
+        while (j < 20)
+        {
+            shot_update(shots);
+            road_check_shots(&road, shots);
+            j++;
+        }
+        check_int("a shot that reaches an obstacle destroys it",
+            road.obstacles[0].destroyed, 1);
+        check_int("the shot that hit is no longer active",
+            shots[0].active, 0);
+    }
+
+    /* a destroyed obstacle stops colliding with the camera too --
+     * shooting one down is a real alternative to steering or flying
+     * over it, not just a visual effect. */
+    camera_init(&cam, 15.0f, 0.0f, 0.0f);
+    check_int("a destroyed obstacle no longer collides",
+        road_check_collision(&road, &cam, 0.0f), EVENT_NONE);
+
+    /* road_reset() puts every obstacle back for the next run -- the
+     * same reason camera_init() puts the camera back at the start. */
+    road_reset(&road);
+    check_int("road_reset() restores a destroyed obstacle",
+        road.obstacles[0].destroyed, 0);
+
+    /* a shot fired from above OBSTACLE_HEIGHT flies over the same
+     * obstacle it would otherwise destroy -- shots respect the same
+     * height gate collision does. */
+    {
+        t_shot  shots[MAX_SHOTS];
+        int     j;
+
+        j = 0;
+        while (j < MAX_SHOTS)
+        {
+            shots[j].active = 0;
+            j++;
+        }
+        shot_fire(shots, (t_vec2){0.0f, 0.0f}, OBSTACLE_HEIGHT);
+        j = 0;
+        while (j < 20)
+        {
+            shot_update(shots);
+            road_check_shots(&road, shots);
+            j++;
+        }
+        check_int("a shot fired above OBSTACLE_HEIGHT flies over an obstacle",
+            road.obstacles[0].destroyed, 0);
+    }
+
     /* short of the finish line, still racing. */
     camera_init(&cam, 60.0f, 0.0f, 0.0f);
     check_int("short of the finish line is not a win",
@@ -186,14 +253,14 @@ int main(void)
 TESTC
 
 logic_build_log=$(gcc -Wall -Wextra -I libtci -I . -c "$WORK_DIR/test_logic.c" -o "$WORK_DIR/test_logic.o" 2>&1 \
-    && gcc "$WORK_DIR/test_logic.o" vec2.o camera.o scaler.o road.o libtci/libtci.a -lm -o "$WORK_DIR/test_logic" 2>&1)
+    && gcc "$WORK_DIR/test_logic.o" vec2.o camera.o scaler.o road.o shot.o libtci/libtci.a -lm -o "$WORK_DIR/test_logic" 2>&1)
 logic_build_status=$?
 
 if [[ "$logic_build_status" -ne 0 ]]; then
     fail "logic tester builds without SDL2" "$logic_build_log"
     exit 1
 fi
-pass "logic tester builds without SDL2 (vec2.o/camera.o/scaler.o/road.o only)"
+pass "logic tester builds without SDL2 (vec2.o/camera.o/scaler.o/road.o/shot.o only)"
 
 echo
 echo "Running the logic tester..."

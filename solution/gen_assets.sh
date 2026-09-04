@@ -4,6 +4,8 @@
 # rock.png / pillar.png: obstacles to dodge, transparent background.
 # marker.png: small background decoration, never checked for collision.
 # player.png: the player's own craft, drawn at a fixed screen position.
+# shot.png: a fired projectile, drawn through the same scaler as
+# obstacles and markers.
 #
 # All drawn at a fixed 128x128 (player.png at 128x80) so render.c's
 # SDL_RenderCopy(..., NULL, &dst) always samples the whole texture --
@@ -68,4 +70,17 @@ d.ellipse(
 )
 player.save("assets/player.png")
 print("  wrote assets/player.png")
+
+shot = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+d = ImageDraw.Draw(shot)
+d.ellipse(
+    [SIZE // 2 - 26, SIZE // 2 - 26, SIZE // 2 + 26, SIZE // 2 + 26],
+    fill=(0xff, 0xd0, 0x30, 255),
+)
+d.ellipse(
+    [SIZE // 2 - 12, SIZE // 2 - 12, SIZE // 2 + 12, SIZE // 2 + 12],
+    fill=(0xff, 0xf5, 0xc0, 255),
+)
+shot.save("assets/shot.png")
+print("  wrote assets/shot.png")
 EOF

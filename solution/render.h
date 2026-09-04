@@ -12,6 +12,7 @@
 # define PLAYER_SPRITE_H    72
 # define HEIGHT_SHIFT_SCALE 0.15f
 # define PLAYER_PX_PER_UNIT 30
+# define SHOT_SCALE         0.2f
 
 void    render_backdrop(SDL_Renderer *ren);
 void    render_road(t_road const *road, t_camera const *cam,
@@ -19,6 +20,8 @@ void    render_road(t_road const *road, t_camera const *cam,
             SDL_Texture *sprites[SPRITE_COUNT]);
 void    render_markers(t_camera const *cam, float cam_height,
             SDL_Renderer *ren, SDL_Texture *marker_tex);
+void    render_shots(t_shot const shots[MAX_SHOTS], t_camera const *cam,
+            SDL_Renderer *ren, SDL_Texture *shot_tex);
 void    render_player(SDL_Renderer *ren, SDL_Texture *player_tex,
             float cam_height, float tilt);
 
