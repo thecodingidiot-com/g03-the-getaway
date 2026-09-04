@@ -2,12 +2,15 @@
 # Synthesize every sound g03 needs -- own-work, generated from square
 # waves with Python's stdlib `wave` module, the same procedurally-
 # generated-art spirit as gen_assets.sh's PIL rectangles and g02b's
-# gen_audio.sh. Two files, matching the two events audio.c actually
-# handles:
+# gen_audio.sh. Three files, matching the three events audio.c
+# actually handles:
 #
 # assets/sfx_shoot.wav  -- short descending zap, kept brief on purpose
 #                          so a held-down burst layers instead of
 #                          smearing into a wash of overlapping tails
+# assets/sfx_hit.wav    -- a quick tick into a short falling crack,
+#                          distinct from both the shot that caused it
+#                          and the crash a collision plays
 # assets/sfx_crash.wav  -- a low thud into a descending rumble
 
 set -e
@@ -71,6 +74,10 @@ def write_wav(path, samples):
     print(f"  wrote {path}")
 
 write_wav("assets/sfx_shoot.wav", sweep_wave(1400, 500, 0.06, amplitude=0.25))
+write_wav("assets/sfx_hit.wav", concat(
+    square_wave(500, 0.02, amplitude=0.35),
+    sweep_wave(700, 200, 0.06, amplitude=0.3),
+))
 write_wav("assets/sfx_crash.wav", concat(
     square_wave(70, 0.05, amplitude=0.4),
     sweep_wave(200, 45, 0.2, amplitude=0.3),

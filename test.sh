@@ -175,6 +175,7 @@ int main(void)
     {
         t_shot  shots[MAX_SHOTS];
         int     j;
+        int     total_hits;
 
         j = 0;
         while (j < MAX_SHOTS)
@@ -184,16 +185,19 @@ int main(void)
         }
         shot_fire(shots, (t_vec2){0.0f, 0.0f}, 0.0f);
         j = 0;
+        total_hits = 0;
         while (j < 30)
         {
             shot_update(shots);
-            map_check_shots(&map, shots);
+            total_hits += map_check_shots(&map, shots);
             j++;
         }
         check_int("a shot that reaches an obstacle destroys it",
             map.obstacles[0].destroyed, 1);
         check_int("the shot that hit is no longer active",
             shots[0].active, 0);
+        check_int("map_check_shots() returns exactly one hit",
+            total_hits, 1);
     }
 
     /* a destroyed obstacle stops colliding with the camera too --
@@ -215,6 +219,7 @@ int main(void)
     {
         t_shot  shots[MAX_SHOTS];
         int     j;
+        int     total_hits;
 
         j = 0;
         while (j < MAX_SHOTS)
@@ -224,14 +229,17 @@ int main(void)
         }
         shot_fire(shots, (t_vec2){0.0f, 0.0f}, OBSTACLE_HEIGHT);
         j = 0;
+        total_hits = 0;
         while (j < 30)
         {
             shot_update(shots);
-            map_check_shots(&map, shots);
+            total_hits += map_check_shots(&map, shots);
             j++;
         }
         check_int("a shot fired above OBSTACLE_HEIGHT flies over an obstacle",
             map.obstacles[0].destroyed, 0);
+        check_int("a shot fired above OBSTACLE_HEIGHT scores no hit",
+            total_hits, 0);
     }
 
     /* short of the finish line, still racing. */

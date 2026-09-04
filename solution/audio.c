@@ -15,8 +15,9 @@ int audio_init(t_audio *audio)
         return (0);
     Mix_AllocateChannels(8);
     audio->sfx_shoot = Mix_LoadWAV("assets/sfx_shoot.wav");
+    audio->sfx_hit = Mix_LoadWAV("assets/sfx_hit.wav");
     audio->sfx_crash = Mix_LoadWAV("assets/sfx_crash.wav");
-    if (!audio->sfx_shoot || !audio->sfx_crash)
+    if (!audio->sfx_shoot || !audio->sfx_hit || !audio->sfx_crash)
         return (0);
     return (1);
 }
@@ -25,6 +26,8 @@ void audio_play_sfx(t_audio const *audio, t_event event)
 {
     if (event == EVENT_FIRED)
         Mix_PlayChannel(-1, audio->sfx_shoot, 0);
+    else if (event == EVENT_HIT)
+        Mix_PlayChannel(-1, audio->sfx_hit, 0);
     else if (event == EVENT_DIED)
         Mix_PlayChannel(-1, audio->sfx_crash, 0);
 }
@@ -32,6 +35,7 @@ void audio_play_sfx(t_audio const *audio, t_event event)
 void audio_free(t_audio *audio)
 {
     Mix_FreeChunk(audio->sfx_shoot);
+    Mix_FreeChunk(audio->sfx_hit);
     Mix_FreeChunk(audio->sfx_crash);
     Mix_CloseAudio();
 }
