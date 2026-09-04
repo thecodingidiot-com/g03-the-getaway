@@ -23,7 +23,7 @@ static int  compare_draw_items(void const *a, void const *b)
 }
 
 /* Fixed, hand-placed decoration -- never loaded, never checked for
-** collision. Scattered wider than any obstacle in road1.txt so they
+** collision. Scattered wider than any obstacle in map1.txt so they
 ** read as background, not as something to dodge. */
 static t_vec2 const g_markers[] = {
     {10.0f, 8.0f}, {10.0f, -9.0f}, {22.0f, 10.0f}, {22.0f, -7.0f},
@@ -80,7 +80,7 @@ static void apply_height_shift(t_projection *proj, float cam_height)
             * HEIGHT_SHIFT_SCALE);
 }
 
-void    render_road(t_road const *road, t_camera const *cam,
+void    render_map(t_map const *map, t_camera const *cam,
         float cam_height, SDL_Renderer *ren,
         SDL_Texture *sprites[SPRITE_COUNT])
 {
@@ -91,10 +91,10 @@ void    render_road(t_road const *road, t_camera const *cam,
 
     visible = 0;
     i = 0;
-    while (i < road->count) {
-        if (!road->obstacles[i].destroyed) {
-            items[visible].proj = scaler_project(cam, road->obstacles[i].pos);
-            items[visible].sprite_id = road->obstacles[i].sprite_id;
+    while (i < map->count) {
+        if (!map->obstacles[i].destroyed) {
+            items[visible].proj = scaler_project(cam, map->obstacles[i].pos);
+            items[visible].sprite_id = map->obstacles[i].sprite_id;
             if (items[visible].proj.visible) {
                 cap_projection(&items[visible].proj);
                 apply_height_shift(&items[visible].proj, cam_height);
@@ -117,7 +117,7 @@ void    render_road(t_road const *road, t_camera const *cam,
 
 /* Same scaler_project() pipeline r01 built, applied to fixed decoration
 ** instead of gameplay obstacles -- shrunk after projecting, not a
-** second technique. Drawn before render_road() calls, so a real
+** second technique. Drawn before render_map() calls, so a real
 ** obstacle painter's-algorithms over a marker at the same depth. */
 void    render_markers(t_camera const *cam, float cam_height,
         SDL_Renderer *ren, SDL_Texture *marker_tex)

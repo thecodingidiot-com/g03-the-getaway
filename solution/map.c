@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "libtci.h"
-#include "road.h"
+#include "map.h"
 
 static void trim_newline(char *line)
 {
@@ -57,7 +57,7 @@ static int  parse_obstacle_line(int fd, t_obstacle *ob)
     return (1);
 }
 
-int road_load(t_road *road, char const *path)
+int map_load(t_map *map, char const *path)
 {
     int fd;
     int finish_dist_int;
@@ -71,26 +71,26 @@ int road_load(t_road *road, char const *path)
         close(fd);
         return (0);
     }
-    road->finish_dist = (float)finish_dist_int;
+    map->finish_dist = (float)finish_dist_int;
     if (!parse_int_line(fd, &count) || count < 0 || count > MAX_OBSTACLES) {
         close(fd);
         return (0);
     }
-    road->count = 0;
+    map->count = 0;
     i = 0;
     while (i < count) {
-        if (!parse_obstacle_line(fd, &road->obstacles[road->count])) {
+        if (!parse_obstacle_line(fd, &map->obstacles[map->count])) {
             close(fd);
             return (0);
         }
-        road->count++;
+        map->count++;
         i++;
     }
     close(fd);
     return (1);
 }
 
-t_event road_check_collision(t_road const *road, t_camera const *cam,
+t_event map_check_collision(t_map const *map, t_camera const *cam,
         float cam_height)
 {
     t_vec2  diff;
@@ -100,9 +100,9 @@ t_event road_check_collision(t_road const *road, t_camera const *cam,
     if (cam_height >= OBSTACLE_HEIGHT)
         return (EVENT_NONE);
     i = 0;
-    while (i < road->count) {
-        if (!road->obstacles[i].destroyed) {
-            diff = vec2_sub(cam->pos, road->obstacles[i].pos);
+    while (i < map->count) {
+        if (!map->obstacles[i].destroyed) {
+            diff = vec2_sub(cam->pos, map->obstacles[i].pos);
             dist = sqrtf(diff.x * diff.x + diff.y * diff.y);
             if (dist < COLLISION_DIST)
                 return (EVENT_DIED);
@@ -112,24 +112,24 @@ t_event road_check_collision(t_road const *road, t_camera const *cam,
     return (EVENT_NONE);
 }
 
-t_event road_check_finish(t_road const *road, t_camera const *cam)
+t_event map_check_finish(t_map const *map, t_camera const *cam)
 {
     float   dist;
 
     dist = sqrtf(cam->pos.x * cam->pos.x + cam->pos.y * cam->pos.y);
-    if (dist >= road->finish_dist)
+    if (dist >= map->finish_dist)
         return (EVENT_WON);
     return (EVENT_NONE);
 }
 
 /* shot.c knows nothing about obstacles -- this is the glue between a
 ** generic projectile and this game's own world, the same split
-** road_check_collision() already draws between "distance" (shared
+** map_check_collision() already draws between "distance" (shared
 ** idea) and "what counts as a hit" (this game's own rule). A shot
 ** that's flying above OBSTACLE_HEIGHT misses everything at ground
 ** level for the same reason the player does at that height: nothing
 ** here can hit what it's already flying clear over. */
-void    road_check_shots(t_road *road, t_shot shots[MAX_SHOTS])
+void    map_check_shots(t_map *map, t_shot shots[MAX_SHOTS])
 {
     t_vec2  diff;
     float   dist;
@@ -140,12 +140,12 @@ void    road_check_shots(t_road *road, t_shot shots[MAX_SHOTS])
     while (i < MAX_SHOTS) {
         if (shots[i].active && shots[i].height < OBSTACLE_HEIGHT) {
             j = 0;
-            while (j < road->count) {
-                if (!road->obstacles[j].destroyed) {
-                    diff = vec2_sub(shots[i].pos, road->obstacles[j].pos);
+            while (j < map->count) {
+                if (!map->obstacles[j].destroyed) {
+                    diff = vec2_sub(shots[i].pos, map->obstacles[j].pos);
                     dist = sqrtf(diff.x * diff.x + diff.y * diff.y);
                     if (dist < SHOT_HIT_DIST) {
-                        road->obstacles[j].destroyed = 1;
+                        map->obstacles[j].destroyed = 1;
                         shots[i].active = 0;
                     }
                 }
@@ -160,13 +160,13 @@ void    road_check_shots(t_road *road, t_shot shots[MAX_SHOTS])
 ** a restart is a fresh attempt at the same course, the same reason
 ** camera_init() puts the camera back at the start instead of wherever
 ** it crashed. */
-void    road_reset(t_road *road)
+void    map_reset(t_map *map)
 {
     int i;
 
     i = 0;
-    while (i < road->count) {
-        road->obstacles[i].destroyed = 0;
+    while (i < map->count) {
+        map->obstacles[i].destroyed = 0;
         i++;
     }
 }

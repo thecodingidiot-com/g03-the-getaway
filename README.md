@@ -39,17 +39,21 @@ r01/r02 already built.
 
 - `vec2.c`, `camera.c`, and `scaler.c` ported unchanged from r01 — the
   same `forward`/`right` camera, the same `WINDOW_H / depth` scaler.
-- A road file (a finish distance, then a list of obstacles: `x y
+- A map file (a finish distance, then a list of obstacles: `x y
   sprite_id`), loaded with `libtci`'s `tci_getline`/`tci_atoi` — this
   is g-tier, not r-tier, so it's `libtci` again, not raw `fopen`.
 - Real collision: driving within `COLLISION_DIST` world units of an
   obstacle, at or below `OBSTACLE_HEIGHT`, ends the run. Reaching
   `finish_dist` world units from the start wins it regardless of
   altitude.
+- Forward speed is constant, not player-controlled — the real Space
+  Harrier (Sega Master System) never gives you a throttle either; the
+  whole d-pad is free for pure positioning.
 - Steering shifts world position directly (`cam->right`, never
   rotated) instead of turning the camera — the same model Hang-On,
   Out Run, and Space Harrier all use, not a raycaster's rotate-then-
-  move. Acceleration/braking have their own keys, off the d-pad.
+  move. `MIN_SIDE`/`MAX_SIDE` fence the play area, the same way the
+  real game does.
 - A real altitude axis: climbing above `OBSTACLE_HEIGHT` clears every
   obstacle on the course, the actual dodge Space Harrier's own up/down
   stick is for. A direct positional step, not ramped like throttle.
@@ -59,7 +63,7 @@ r01/r02 already built.
   applied to feel and readability instead of new math.
 - A third way through the course: Ctrl fires a shot that destroys the
   first obstacle it reaches. A destroyed obstacle stops colliding and
-  stops rendering; `road_reset()` restores every one of them for the
+  stops rendering; `map_reset()` restores every one of them for the
   next run, the same reason `camera_init()` resets position.
 - No score, no HUD, no audio — outcomes print to the terminal and the
   run restarts. Art and sound are a later part of this curriculum, not
@@ -73,11 +77,11 @@ Source is split by concern, one file per module:
 | `vec2.c` / `vec2.h` | a small 2D vector type: add, subtract, scale, dot (unchanged from r01/r02) |
 | `camera.c` / `camera.h` | position, facing angle, and the derived `forward`/`right` axes (unchanged from r01/r02) — no SDL2 anywhere |
 | `scaler.c` / `scaler.h` | world position → screen projection (unchanged from r01/r02) — no SDL2 anywhere |
-| `road.c` / `road.h` | load the road file, collision/finish/shot-hit checks — no SDL2 anywhere |
+| `map.c` / `map.h` | load the map file, collision/finish/shot-hit checks — no SDL2 anywhere |
 | `shot.c` / `shot.h` | a generic projectile pool — fire, advance, age out — knows nothing about obstacles at all, no SDL2 anywhere |
 | `render.c` / `render.h` | the only file that calls actual SDL2 drawing functions |
 
-`vec2.c`, `camera.c`, `scaler.c`, `road.c`, and `shot.c` never call an
+`vec2.c`, `camera.c`, `scaler.c`, `map.c`, and `shot.c` never call an
 SDL2 function, so they link into a test binary with no SDL2 library at
 all.
 
@@ -93,13 +97,14 @@ cd solution
 make -C libtci re
 bash gen_assets.sh
 make re
-./getaway ../fixtures/road1.txt
+./getaway ../fixtures/map1.txt
 ```
 
 Controls: Left/Right arrows or `h`/`l` to steer (a direct sideways
 shift, not a turn — the camera always faces forward), Up/Down arrows
-or `k`/`j` to climb/descend, Space to accelerate, Shift to brake,
-Ctrl to fire, Escape or `q` to quit.
+or `k`/`j` to climb/descend, Ctrl to fire, Escape or `q` to quit.
+Forward speed is constant — there's no accelerate/brake key, matching
+the real game this chapter is named after.
 
 `gen_assets.sh` needs Python3 + Pillow:
 
@@ -114,26 +119,26 @@ sudo apt install python3-pil
 **Build** — the real game compiles and links with zero warnings.
 
 **A standalone logic tester** — `vec2.o`, `camera.o`, `scaler.o`,
-`road.o`, and `shot.o` compiled and linked with `libtci.a` alone, no
-SDL2 at all, asserting real outcomes against `fixtures/road1.txt`:
+`map.o`, and `shot.o` compiled and linked with `libtci.a` alone, no
+SDL2 at all, asserting real outcomes against `fixtures/map1.txt`:
 
-- The road file parses to the right obstacle count and finish
+- The map file parses to the right obstacle count and finish
   distance.
 - Standing on an obstacle is a collision; a couple of world units off
   it is not.
-- The open road between obstacles never falsely reports a collision.
+- The open ground between obstacles never falsely reports a collision.
 - Flying at or above `OBSTACLE_HEIGHT` clears an obstacle that would
   otherwise be a certain collision; just under that height still
   isn't enough.
 - A shot that reaches an obstacle destroys it and deactivates itself;
-  a destroyed obstacle stops colliding; `road_reset()` restores it.
+  a destroyed obstacle stops colliding; `map_reset()` restores it.
 - A shot fired from above `OBSTACLE_HEIGHT` flies over an obstacle,
   same as the player would.
 - Reaching the finish distance wins the run; short of it does not.
 
 **`getaway`** — runs its event loop for two seconds under a headless
 (`SDL_VIDEODRIVER=dummy`) video driver without crashing. A smoke test,
-not a visual check — actually driving the road, dodging obstacles by
+not a visual check — actually running the course, dodging obstacles by
 steering, altitude, or shooting them down, is done by running it
 yourself.
 
