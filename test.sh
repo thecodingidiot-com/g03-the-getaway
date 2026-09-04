@@ -286,7 +286,7 @@ fi
 
 echo
 echo "Running getaway headless (2s)..."
-SDL_VIDEODRIVER=dummy timeout 2 ./getaway "$FIXTURES/map1.txt"
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 2 ./getaway "$FIXTURES/map1.txt"
 getaway_status=$?
 if [[ "$getaway_status" -eq 124 ]]; then
     pass "getaway runs its event loop for 2s without crashing"

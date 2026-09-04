@@ -6,6 +6,7 @@
 #include "shot.h"
 #include "map.h"
 #include "render.h"
+#include "audio.h"
 
 #define FORWARD_SPEED   0.6f
 #define STRAFE_SPEED    0.3f
@@ -74,8 +75,11 @@ static void handle_altitude(float *cam_height, Uint8 const *keys)
 ** real Space Harrier emulator default; Ctrl stays as the more common
 ** PC-game fire key. shot_fire() itself doesn't know or care what's
 ** about to fire on it; it just claims the first free slot in the
-** pool. */
-static void handle_fire(t_shot shots[MAX_SHOTS], int *cooldown,
+** pool. Returning EVENT_FIRED only on an actual fire -- not on every
+** frame the key is held -- is what lets audio_play_sfx() below treat
+** it exactly like map_check_collision()/map_check_finish() already
+** are: a t_event, checked once, played once. */
+static t_event handle_fire(t_shot shots[MAX_SHOTS], int *cooldown,
         t_camera const *cam, float cam_height, Uint8 const *keys)
 {
     if (*cooldown > 0)
@@ -84,15 +88,18 @@ static void handle_fire(t_shot shots[MAX_SHOTS], int *cooldown,
             || keys[SDL_SCANCODE_D]) && *cooldown == 0) {
         shot_fire(shots, cam->pos, cam_height);
         *cooldown = FIRE_COOLDOWN;
+        return (EVENT_FIRED);
     }
+    return (EVENT_NONE);
 }
 
 static void handle_terminal_event(t_camera *cam, float *cam_height,
-        float *tilt, t_map *map, t_shot shots[MAX_SHOTS], t_event event,
-        int *runs)
+        float *tilt, t_map *map, t_shot shots[MAX_SHOTS], t_audio const *audio,
+        t_event event, int *runs)
 {
     int i;
 
+    audio_play_sfx(audio, event);
     if (event == EVENT_NONE)
         return ;
     if (event == EVENT_DIED)
@@ -123,6 +130,7 @@ int main(int argc, char **argv)
     t_map           map;
     t_camera        cam;
     t_shot          shots[MAX_SHOTS];
+    t_audio         audio;
     Uint8 const     *keys;
     int             running;
     int             runs;
@@ -158,6 +166,11 @@ int main(int argc, char **argv)
         tci_printf("did you run 'bash gen_assets.sh' first?\n");
         return (1);
     }
+    if (!audio_init(&audio)) {
+        tci_printf("audio_init: %s\n", Mix_GetError());
+        tci_printf("did you run 'bash gen_audio.sh' first?\n");
+        return (1);
+    }
     camera_init(&cam, 0.0f, 0.0f, 0.0f);
     cam_height = 0.0f;
     tilt = 0.0f;
@@ -180,13 +193,14 @@ int main(int argc, char **argv)
         keys = SDL_GetKeyboardState(NULL);
         handle_steering(&cam, &tilt, keys);
         handle_altitude(&cam_height, keys);
-        handle_fire(shots, &fire_cooldown, &cam, cam_height, keys);
+        audio_play_sfx(&audio,
+            handle_fire(shots, &fire_cooldown, &cam, cam_height, keys));
         camera_move(&cam, FORWARD_SPEED);
         shot_update(shots);
         map_check_shots(&map, shots);
-        handle_terminal_event(&cam, &cam_height, &tilt, &map, shots,
+        handle_terminal_event(&cam, &cam_height, &tilt, &map, shots, &audio,
             map_check_collision(&map, &cam, cam_height), &runs);
-        handle_terminal_event(&cam, &cam_height, &tilt, &map, shots,
+        handle_terminal_event(&cam, &cam_height, &tilt, &map, shots, &audio,
             map_check_finish(&map, &cam), &runs);
         render_backdrop(ren);
         render_markers(&cam, cam_height, ren, marker_tex);
@@ -196,6 +210,7 @@ int main(int argc, char **argv)
         SDL_RenderPresent(ren);
         SDL_Delay(16);
     }
+    audio_free(&audio);
     SDL_DestroyTexture(sprites[0]);
     SDL_DestroyTexture(sprites[1]);
     SDL_DestroyTexture(marker_tex);

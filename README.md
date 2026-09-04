@@ -19,6 +19,7 @@ git clone https://github.com/thecodingidiot-com/g03-the-getaway.git g03-practice
 cd g03-practice/solution
 make -C libtci re
 bash gen_assets.sh
+bash gen_audio.sh
 make re
 bash ../test.sh
 ```
@@ -66,25 +67,27 @@ r01/r02 already built.
   colliding and stops rendering; `map_reset()` restores every one of
   them for the next run, the same reason `camera_init()` resets
   position.
-- No score, no HUD, no audio — outcomes print to the terminal and the
-  run restarts. Art and sound are a later part of this curriculum, not
-  this chapter's job.
+- Two sound effects — a shot and a crash — the only audio this chapter
+  adds. No score, no HUD, no music yet; those are still a later part
+  of this curriculum.
 
 Source is split by concern, one file per module:
 
 | File | Contents |
 | --- | --- |
-| `main.c` | SDL2 init, the game loop (event → update → render), cleanup |
+| `main.c` | SDL2 + SDL2_mixer init, the game loop (event → update → render), cleanup |
 | `vec2.c` / `vec2.h` | a small 2D vector type: add, subtract, scale, dot (unchanged from r01/r02) |
 | `camera.c` / `camera.h` | position, facing angle, and the derived `forward`/`right` axes (unchanged from r01/r02) — no SDL2 anywhere |
 | `scaler.c` / `scaler.h` | world position → screen projection (unchanged from r01/r02) — no SDL2 anywhere |
 | `map.c` / `map.h` | load the map file, collision/finish/shot-hit checks — no SDL2 anywhere |
 | `shot.c` / `shot.h` | a generic projectile pool — fire, advance, age out — knows nothing about obstacles at all, no SDL2 anywhere |
 | `render.c` / `render.h` | the only file that calls actual SDL2 drawing functions |
+| `audio.c` / `audio.h` | **new** — the only file that calls actual SDL2_mixer functions |
+| `event.h` | **new** — the shared `t_event` enum, now carrying `EVENT_FIRED` alongside `EVENT_DIED`/`EVENT_WON` |
 
 `vec2.c`, `camera.c`, `scaler.c`, `map.c`, and `shot.c` never call an
-SDL2 function, so they link into a test binary with no SDL2 library at
-all.
+SDL2 (or SDL2_mixer) function, so they link into a test binary with
+neither library at all.
 
 Build and test your own version first. Use `solution/` to compare
 once you are done, not before.
@@ -97,6 +100,7 @@ once you are done, not before.
 cd solution
 make -C libtci re
 bash gen_assets.sh
+bash gen_audio.sh
 make re
 ./getaway ../fixtures/map1.txt
 ```
@@ -108,11 +112,17 @@ emulator's default), Escape or `q` to quit. Forward speed is constant
 — there's no accelerate/brake key, matching the real game this chapter
 is named after.
 
-`gen_assets.sh` needs Python3 + Pillow:
+`gen_assets.sh` and `gen_audio.sh` need Python3 + Pillow (stdlib
+`wave` covers the audio synthesis — no extra package):
 
 ```bash
-sudo apt install python3-pil
+sudo apt install python3-pil libsdl2-mixer-dev
 ```
+
+Both sound effects are synthesized locally by `gen_audio.sh` — own-
+work square/sweep waves, not sourced from anywhere — so there is
+nothing to attribute and no license file for `assets/*.wav` beyond
+this repository's own MIT license.
 
 ---
 
@@ -122,7 +132,8 @@ sudo apt install python3-pil
 
 **A standalone logic tester** — `vec2.o`, `camera.o`, `scaler.o`,
 `map.o`, and `shot.o` compiled and linked with `libtci.a` alone, no
-SDL2 at all, asserting real outcomes against `fixtures/map1.txt`:
+SDL2 or SDL2_mixer at all, asserting real outcomes against
+`fixtures/map1.txt`:
 
 - The map file parses to the right obstacle count and finish
   distance.
@@ -139,9 +150,10 @@ SDL2 at all, asserting real outcomes against `fixtures/map1.txt`:
 - Reaching the finish distance wins the run; short of it does not.
 
 **`getaway`** — runs its event loop for two seconds under a headless
-(`SDL_VIDEODRIVER=dummy`) video driver without crashing. A smoke test,
-not a visual check — actually running the course, dodging obstacles by
-steering, altitude, or shooting them down, is done by running it
+(`SDL_VIDEODRIVER=dummy`, `SDL_AUDIODRIVER=dummy`) driver without
+crashing. A smoke test, not a visual or audible check — actually
+running the course, dodging obstacles by steering, altitude, or
+shooting them down, is done by running it
 yourself.
 
 ---
