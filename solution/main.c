@@ -4,27 +4,28 @@
 #include "camera.h"
 #include "scaler.h"
 #include "shot.h"
-#include "road.h"
+#include "map.h"
 #include "render.h"
 
+#define FORWARD_SPEED   0.6f
 #define STRAFE_SPEED    0.3f
 #define VERTICAL_SPEED  0.07f
-#define MAX_SPEED       1.1f
-#define MIN_SPEED       -0.4f
-#define ACCEL           0.025f
-#define BRAKE           0.05f
-#define DECEL           0.015f
 #define MAX_TILT_DEG    25.0f
 #define TILT_EASE       0.2f
 
 /* Hang-On/Out Run/Space Harrier never rotate the camera -- steering
-** shifts world position directly, so the road (or the open ground
-** here) slides sideways under a craft that keeps facing forward. The
-** first version of this file called camera_turn() for left/right,
-** which is the raycaster's steering model (r03 rotates and moves
-** forward), not this one -- caught by actually playing it, not by
-** reading the code. `cam->right` never changes once `camera_turn()`
-** is never called, so this is a plain vector add, not a rotation.
+** shifts world position directly, so the ground slides sideways under
+** a craft that keeps facing forward. The first version of this file
+** called camera_turn() for left/right, which is the raycaster's
+** steering model (r03 rotates and moves forward), not this one --
+** caught by actually playing it, not by reading the code. `cam->right`
+** never changes once `camera_turn()` is never called, so this is a
+** plain vector add, not a rotation.
+**
+** MIN_SIDE/MAX_SIDE fence the play area, the same way the real game
+** does -- clamped directly on `cam->pos.y`, which is safe here only
+** because `forward` never rotates away from (1, 0): `y` genuinely is
+** the whole lateral coordinate, not an approximation of it.
 **
 ** `*tilt` is purely cosmetic on top of that -- it never touches
 ** `cam->pos`, only how the player's own sprite gets drawn. It eases
@@ -43,14 +44,16 @@ static void handle_steering(t_camera *cam, float *tilt, Uint8 const *keys)
         cam->pos = vec2_add(cam->pos, vec2_scale(cam->right, STRAFE_SPEED));
         target = -MAX_TILT_DEG;
     }
+    if (cam->pos.y > MAX_SIDE)
+        cam->pos.y = MAX_SIDE;
+    if (cam->pos.y < MIN_SIDE)
+        cam->pos.y = MIN_SIDE;
     *tilt += (target - *tilt) * TILT_EASE;
 }
 
 /* Space Harrier's other axis -- up/down never touched the camera at
 ** all before this. A direct step, same as steering, clamped to a
-** fixed band rather than ramped: this is positioning, not throttle,
-** and the two behave differently on a real stick for the same reason
-** they get separate keys below. */
+** fixed band rather than ramped: this is positioning, not throttle. */
 static void handle_altitude(float *cam_height, Uint8 const *keys)
 {
     if (keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_K]) {
@@ -62,30 +65,6 @@ static void handle_altitude(float *cam_height, Uint8 const *keys)
         *cam_height -= VERTICAL_SPEED;
         if (*cam_height < MIN_HEIGHT)
             *cam_height = MIN_HEIGHT;
-    }
-}
-
-/* Acceleration/braking on their own keys now, not sharing the d-pad
-** with steering -- separate controls in every one of the cabinets
-** this chapter is named after, not one stick doing both jobs. */
-static void handle_throttle(float *speed, Uint8 const *keys)
-{
-    if (keys[SDL_SCANCODE_SPACE]) {
-        *speed += ACCEL;
-        if (*speed > MAX_SPEED)
-            *speed = MAX_SPEED;
-    } else if (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) {
-        *speed -= BRAKE;
-        if (*speed < MIN_SPEED)
-            *speed = MIN_SPEED;
-    } else if (*speed > 0.0f) {
-        *speed -= DECEL;
-        if (*speed < 0.0f)
-            *speed = 0.0f;
-    } else if (*speed < 0.0f) {
-        *speed += DECEL;
-        if (*speed > 0.0f)
-            *speed = 0.0f;
     }
 }
 
@@ -106,9 +85,9 @@ static void handle_fire(t_shot shots[MAX_SHOTS], int *cooldown,
     }
 }
 
-static void handle_terminal_event(t_camera *cam, float *speed,
-        float *cam_height, float *tilt, t_road *road,
-        t_shot shots[MAX_SHOTS], t_event event, int *runs)
+static void handle_terminal_event(t_camera *cam, float *cam_height,
+        float *tilt, t_map *map, t_shot shots[MAX_SHOTS], t_event event,
+        int *runs)
 {
     int i;
 
@@ -120,10 +99,9 @@ static void handle_terminal_event(t_camera *cam, float *speed,
         tci_printf("made it -- run %d won, restarting\n", *runs);
     *runs = *runs + 1;
     camera_init(cam, 0.0f, 0.0f, 0.0f);
-    *speed = 0.0f;
     *cam_height = 0.0f;
     *tilt = 0.0f;
-    road_reset(road);
+    map_reset(map);
     i = 0;
     while (i < MAX_SHOTS) {
         shots[i].active = 0;
@@ -140,7 +118,7 @@ int main(int argc, char **argv)
     SDL_Texture     *marker_tex;
     SDL_Texture     *player_tex;
     SDL_Texture     *shot_tex;
-    t_road          road;
+    t_map           map;
     t_camera        cam;
     t_shot          shots[MAX_SHOTS];
     Uint8 const     *keys;
@@ -148,16 +126,15 @@ int main(int argc, char **argv)
     int             runs;
     int             fire_cooldown;
     int             i;
-    float           speed;
     float           cam_height;
     float           tilt;
 
     if (argc < 2) {
-        tci_printf("usage: %s <road_file>\n", argv[0]);
+        tci_printf("usage: %s <map_file>\n", argv[0]);
         return (1);
     }
-    if (!road_load(&road, argv[1])) {
-        tci_printf("failed to load road: %s\n", argv[1]);
+    if (!map_load(&map, argv[1])) {
+        tci_printf("failed to load map: %s\n", argv[1]);
         return (1);
     }
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -180,7 +157,6 @@ int main(int argc, char **argv)
         return (1);
     }
     camera_init(&cam, 0.0f, 0.0f, 0.0f);
-    speed = 0.0f;
     cam_height = 0.0f;
     tilt = 0.0f;
     fire_cooldown = 0;
@@ -202,18 +178,17 @@ int main(int argc, char **argv)
         keys = SDL_GetKeyboardState(NULL);
         handle_steering(&cam, &tilt, keys);
         handle_altitude(&cam_height, keys);
-        handle_throttle(&speed, keys);
         handle_fire(shots, &fire_cooldown, &cam, cam_height, keys);
-        camera_move(&cam, speed);
+        camera_move(&cam, FORWARD_SPEED);
         shot_update(shots);
-        road_check_shots(&road, shots);
-        handle_terminal_event(&cam, &speed, &cam_height, &tilt, &road, shots,
-            road_check_collision(&road, &cam, cam_height), &runs);
-        handle_terminal_event(&cam, &speed, &cam_height, &tilt, &road, shots,
-            road_check_finish(&road, &cam), &runs);
+        map_check_shots(&map, shots);
+        handle_terminal_event(&cam, &cam_height, &tilt, &map, shots,
+            map_check_collision(&map, &cam, cam_height), &runs);
+        handle_terminal_event(&cam, &cam_height, &tilt, &map, shots,
+            map_check_finish(&map, &cam), &runs);
         render_backdrop(ren);
         render_markers(&cam, cam_height, ren, marker_tex);
-        render_road(&road, &cam, cam_height, ren, sprites);
+        render_map(&map, &cam, cam_height, ren, sprites);
         render_shots(shots, &cam, ren, shot_tex);
         render_player(ren, player_tex, cam_height, tilt);
         SDL_RenderPresent(ren);
