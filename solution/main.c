@@ -203,6 +203,7 @@ int main(int argc, char **argv)
         handle_terminal_event(&cam, &cam_height, &tilt, &map, shots, &audio,
             map_check_finish(&map, &cam), &runs);
         render_backdrop(ren);
+        render_ground_stripes(&cam, ren);
         render_markers(&cam, cam_height, ren, marker_tex);
         render_map(&map, &cam, cam_height, ren, sprites);
         render_shots(shots, &cam, ren, shot_tex);

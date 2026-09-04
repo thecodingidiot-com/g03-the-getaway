@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdlib.h>
 #include "render.h"
 #include "scaler.h"
@@ -50,6 +51,53 @@ void    render_backdrop(SDL_Renderer *ren)
     SDL_RenderFillRect(ren, &sky);
     SDL_SetRenderDrawColor(ren, 0x4a, 0x8a, 0x4a, 0xff);
     SDL_RenderFillRect(ren, &ground);
+}
+
+/* Space Harrier's own real floor is a moving scanline surface -- a
+** different, larger technique this chapter still doesn't attempt.
+** This reuses the one already here instead: scaler_project()'s own
+** `size` field, the same WINDOW_H / depth growth every billboard is
+** scaled by, applied downward from HORIZON_Y instead of upward --
+** ground recedes into the horizon exactly as fast as a billboard at
+** the same depth grows, because it's the same division.
+**
+** STRIPE_SPACING world units apart, STRIPE_COUNT of them, each one's
+** depth wrapping through cam->pos.x with fmodf() -- the same "how far
+** through the current cycle" idea a clock face uses, so a stripe
+** slides continuously toward the camera and off the near plane
+** instead of jumping there. The next one behind it is already
+** sliding in from the horizon; nothing is ever reset or respawned. */
+void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
+{
+    t_projection    proj;
+    t_vec2          far_point;
+    SDL_Rect        band;
+    int             thickness;
+    int             i;
+
+    i = 0;
+    while (i < STRIPE_COUNT) {
+        far_point.x = cam->pos.x + STRIPE_SPACING
+            - fmodf(cam->pos.x, STRIPE_SPACING) + (float)i * STRIPE_SPACING;
+        far_point.y = cam->pos.y;
+        proj = scaler_project(cam, far_point);
+        if (proj.visible && i % 2 == 0) {
+            band.y = HORIZON_Y + (int)((float)proj.size * STRIPE_Y_SCALE);
+            thickness = (int)((float)proj.size * STRIPE_THICKNESS_SCALE);
+            if (thickness > STRIPE_MAX_THICKNESS)
+                thickness = STRIPE_MAX_THICKNESS;
+            if (thickness < 1)
+                thickness = 1;
+            if (band.y < WINDOW_H) {
+                band.x = 0;
+                band.w = WINDOW_W;
+                band.h = thickness;
+                SDL_SetRenderDrawColor(ren, 0x3d, 0x74, 0x3d, 0xff);
+                SDL_RenderFillRect(ren, &band);
+            }
+        }
+        i++;
+    }
 }
 
 /* h = WINDOW_H / depth grows without bound as depth shrinks -- close
