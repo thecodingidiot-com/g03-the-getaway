@@ -20,6 +20,6 @@ void    render_road(t_road const *road, t_camera const *cam,
 void    render_markers(t_camera const *cam, float cam_height,
             SDL_Renderer *ren, SDL_Texture *marker_tex);
 void    render_player(SDL_Renderer *ren, SDL_Texture *player_tex,
-            float cam_height);
+            float cam_height, float tilt);
 
 #endif
