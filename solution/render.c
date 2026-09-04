@@ -7,6 +7,7 @@ typedef struct s_draw_item
 {
     t_projection    proj;
     int             sprite_id;
+    int             flashing;
 }   t_draw_item;
 
 /* Painter's algorithm, unchanged from r01/r02: farthest first, so a
@@ -34,6 +35,9 @@ static t_vec2 const g_markers[] = {
 };
 # define MARKER_COUNT (int)(sizeof(g_markers) / sizeof(g_markers[0]))
 
+/* Dark sky, dark ground, a violet horizon between them -- the same
+** palette hestia's own theme and thecodingidiot.com's homepage tunnel
+** already use, not a new one invented for this chapter alone. */
 void    render_backdrop(SDL_Renderer *ren)
 {
     SDL_Rect    sky;
@@ -47,9 +51,9 @@ void    render_backdrop(SDL_Renderer *ren)
     ground.y = HORIZON_Y;
     ground.w = WINDOW_W;
     ground.h = WINDOW_H - HORIZON_Y;
-    SDL_SetRenderDrawColor(ren, 0x5c, 0x9d, 0xe8, 0xff);
+    SDL_SetRenderDrawColor(ren, 0x0f, 0x0f, 0x0f, 0xff);
     SDL_RenderFillRect(ren, &sky);
-    SDL_SetRenderDrawColor(ren, 0x4a, 0x8a, 0x4a, 0xff);
+    SDL_SetRenderDrawColor(ren, 0x1c, 0x15, 0x26, 0xff);
     SDL_RenderFillRect(ren, &ground);
 }
 
@@ -92,7 +96,7 @@ void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
                 band.x = 0;
                 band.w = WINDOW_W;
                 band.h = thickness;
-                SDL_SetRenderDrawColor(ren, 0x3d, 0x74, 0x3d, 0xff);
+                SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
                 SDL_RenderFillRect(ren, &band);
             }
         }
@@ -128,6 +132,11 @@ static void apply_height_shift(t_projection *proj, float cam_height)
             * HEIGHT_SHIFT_SCALE);
 }
 
+/* A destroyed obstacle isn't skipped the instant it dies -- it still
+** projects and draws for FLASH_DURATION frames, just as a solid flash
+** instead of its own sprite, so a hit reads as a bright light hitting
+** the target instead of the obstacle simply vanishing. Once
+** flash_timer reaches zero it's finally skipped, same as before. */
 void    render_map(t_map const *map, t_camera const *cam,
         float cam_height, SDL_Renderer *ren,
         SDL_Texture *sprites[SPRITE_COUNT])
@@ -140,9 +149,10 @@ void    render_map(t_map const *map, t_camera const *cam,
     visible = 0;
     i = 0;
     while (i < map->count) {
-        if (!map->obstacles[i].destroyed) {
+        if (!map->obstacles[i].destroyed || map->obstacles[i].flash_timer > 0) {
             items[visible].proj = scaler_project(cam, map->obstacles[i].pos);
             items[visible].sprite_id = map->obstacles[i].sprite_id;
+            items[visible].flashing = map->obstacles[i].destroyed;
             if (items[visible].proj.visible) {
                 cap_projection(&items[visible].proj);
                 apply_height_shift(&items[visible].proj, cam_height);
@@ -158,7 +168,11 @@ void    render_map(t_map const *map, t_camera const *cam,
         dst.y = items[i].proj.screen_y;
         dst.w = items[i].proj.size;
         dst.h = items[i].proj.size;
-        SDL_RenderCopy(ren, sprites[items[i].sprite_id], NULL, &dst);
+        if (items[i].flashing) {
+            SDL_SetRenderDrawColor(ren, 0xff, 0xff, 0xff, 0xff);
+            SDL_RenderFillRect(ren, &dst);
+        } else
+            SDL_RenderCopy(ren, sprites[items[i].sprite_id], NULL, &dst);
         i++;
     }
 }

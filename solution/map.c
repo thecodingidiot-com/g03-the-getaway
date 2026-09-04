@@ -53,6 +53,7 @@ static int  parse_obstacle_line(int fd, t_obstacle *ob)
     ob->pos.y = (float)tci_atoi(first_space + 1);
     ob->sprite_id = tci_atoi(second_space + 1);
     ob->destroyed = 0;
+    ob->flash_timer = 0;
     free(line);
     return (1);
 }
@@ -154,6 +155,7 @@ int     map_check_shots(t_map *map, t_shot shots[MAX_SHOTS])
                     dist = sqrtf(diff.x * diff.x + diff.y * diff.y);
                     if (dist < SHOT_HIT_DIST) {
                         map->obstacles[j].destroyed = 1;
+                        map->obstacles[j].flash_timer = FLASH_DURATION;
                         shots[i].active = 0;
                         hits++;
                     }
@@ -164,6 +166,24 @@ int     map_check_shots(t_map *map, t_shot shots[MAX_SHOTS])
         i++;
     }
     return (hits);
+}
+
+/* A destroyed obstacle still renders for FLASH_DURATION frames after
+** it stops colliding -- render_map() draws it as a bright flash
+** instead of its sprite for exactly that long, then skips it for
+** good. Ticked once a frame regardless of whether a new hit landed,
+** the same way shot_update() ages every shot whether or not any of
+** them just fired. */
+void    map_tick_flashes(t_map *map)
+{
+    int i;
+
+    i = 0;
+    while (i < map->count) {
+        if (map->obstacles[i].flash_timer > 0)
+            map->obstacles[i].flash_timer--;
+        i++;
+    }
 }
 
 /* Every obstacle destroyed this run comes back for the next one --
@@ -177,6 +197,7 @@ void    map_reset(t_map *map)
     i = 0;
     while (i < map->count) {
         map->obstacles[i].destroyed = 0;
+        map->obstacles[i].flash_timer = 0;
         i++;
     }
 }
