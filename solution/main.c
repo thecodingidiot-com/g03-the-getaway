@@ -147,7 +147,7 @@ int main(int argc, char **argv)
         tci_printf("failed to load map: %s\n", argv[1]);
         return (1);
     }
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         SDL_Log("SDL_Init: %s", SDL_GetError());
         return (1);
     }
