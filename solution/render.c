@@ -68,8 +68,21 @@ static void cap_projection(t_projection *proj)
     }
 }
 
+/* Ground-anchored objects sink toward the bottom of the screen the
+** higher the camera climbs -- the same idea as looking down at
+** something from above instead of standing level with it. Scaled by
+** the object's own (already distance-scaled) size, the same way the
+** size cap reuses a value scaler_project() already computed instead
+** of inventing a second distance measure. */
+static void apply_height_shift(t_projection *proj, float cam_height)
+{
+    proj->screen_y += (int)(cam_height * (float)proj->size
+            * HEIGHT_SHIFT_SCALE);
+}
+
 void    render_road(t_road const *road, t_camera const *cam,
-        SDL_Renderer *ren, SDL_Texture *sprites[SPRITE_COUNT])
+        float cam_height, SDL_Renderer *ren,
+        SDL_Texture *sprites[SPRITE_COUNT])
 {
     t_draw_item items[MAX_OBSTACLES];
     int         visible;
@@ -83,6 +96,7 @@ void    render_road(t_road const *road, t_camera const *cam,
         items[visible].sprite_id = road->obstacles[i].sprite_id;
         if (items[visible].proj.visible) {
             cap_projection(&items[visible].proj);
+            apply_height_shift(&items[visible].proj, cam_height);
             visible++;
         }
         i++;
@@ -103,8 +117,8 @@ void    render_road(t_road const *road, t_camera const *cam,
 ** instead of gameplay obstacles -- shrunk after projecting, not a
 ** second technique. Drawn before render_road() calls, so a real
 ** obstacle painter's-algorithms over a marker at the same depth. */
-void    render_markers(t_camera const *cam, SDL_Renderer *ren,
-        SDL_Texture *marker_tex)
+void    render_markers(t_camera const *cam, float cam_height,
+        SDL_Renderer *ren, SDL_Texture *marker_tex)
 {
     t_draw_item items[MARKER_COUNT];
     int         visible;
@@ -118,6 +132,7 @@ void    render_markers(t_camera const *cam, SDL_Renderer *ren,
         items[visible].proj = scaler_project(cam, g_markers[i]);
         if (items[visible].proj.visible) {
             cap_projection(&items[visible].proj);
+            apply_height_shift(&items[visible].proj, cam_height);
             visible++;
         }
         i++;
@@ -127,7 +142,7 @@ void    render_markers(t_camera const *cam, SDL_Renderer *ren,
     while (i < visible) {
         shrunk = (int)((float)items[i].proj.size * MARKER_SCALE);
         dst.x = items[i].proj.screen_x + (items[i].proj.size - shrunk) / 2;
-        dst.y = HORIZON_Y - shrunk;
+        dst.y = items[i].proj.screen_y + items[i].proj.size - shrunk;
         dst.w = shrunk;
         dst.h = shrunk;
         SDL_RenderCopy(ren, marker_tex, NULL, &dst);
@@ -136,15 +151,19 @@ void    render_markers(t_camera const *cam, SDL_Renderer *ren,
 }
 
 /* No projection at all -- the player's own craft sits at a fixed
-** point on screen every frame, the same way the dashboard in an
-** Out Run cabinet never moves while the road does. */
-void    render_player(SDL_Renderer *ren, SDL_Texture *player_tex)
+** horizontal point on screen every frame, the same way the dashboard
+** in an Out Run cabinet never moves while the road does. Altitude is
+** the one exception: it moves the craft itself, in real pixels, not
+** anything projected -- Space Harrier's own on-screen character does
+** exactly this, no depth involved at all. */
+void    render_player(SDL_Renderer *ren, SDL_Texture *player_tex,
+        float cam_height)
 {
     SDL_Rect    dst;
 
     dst.w = PLAYER_SPRITE_W;
     dst.h = PLAYER_SPRITE_H;
     dst.x = WINDOW_W / 2 - dst.w / 2;
-    dst.y = WINDOW_H - dst.h - 24;
+    dst.y = WINDOW_H - dst.h - 24 - (int)(cam_height * PLAYER_PX_PER_UNIT);
     SDL_RenderCopy(ren, player_tex, NULL, &dst);
 }

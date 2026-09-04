@@ -4,8 +4,11 @@
 # include "vec2.h"
 # include "camera.h"
 
-# define MAX_OBSTACLES  64
-# define COLLISION_DIST 1.2f
+# define MAX_OBSTACLES      64
+# define COLLISION_DIST     1.2f
+# define OBSTACLE_HEIGHT    2.0f
+# define MIN_HEIGHT         0.0f
+# define MAX_HEIGHT         3.5f
 
 typedef enum e_event
 {
@@ -28,7 +31,8 @@ typedef struct s_road
 }   t_road;
 
 int     road_load(t_road *road, char const *path);
-t_event road_check_collision(t_road const *road, t_camera const *cam);
+t_event road_check_collision(t_road const *road, t_camera const *cam,
+            float cam_height);
 t_event road_check_finish(t_road const *road, t_camera const *cam);
 
 #endif

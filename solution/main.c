@@ -7,6 +7,7 @@
 #include "render.h"
 
 #define STRAFE_SPEED    0.3f
+#define VERTICAL_SPEED  0.07f
 #define MAX_SPEED       1.1f
 #define MIN_SPEED       -0.4f
 #define ACCEL           0.025f
@@ -27,6 +28,25 @@ static void handle_steering(t_camera *cam, Uint8 const *keys)
         cam->pos = vec2_add(cam->pos, vec2_scale(cam->right, -STRAFE_SPEED));
     if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_L])
         cam->pos = vec2_add(cam->pos, vec2_scale(cam->right, STRAFE_SPEED));
+}
+
+/* Space Harrier's other axis -- up/down never touched the camera at
+** all before this. A direct step, same as steering, clamped to a
+** fixed band rather than ramped: this is positioning, not throttle,
+** and the two behave differently on a real stick for the same reason
+** they get separate keys below. */
+static void handle_altitude(float *cam_height, Uint8 const *keys)
+{
+    if (keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_K]) {
+        *cam_height += VERTICAL_SPEED;
+        if (*cam_height > MAX_HEIGHT)
+            *cam_height = MAX_HEIGHT;
+    }
+    if (keys[SDL_SCANCODE_DOWN] || keys[SDL_SCANCODE_J]) {
+        *cam_height -= VERTICAL_SPEED;
+        if (*cam_height < MIN_HEIGHT)
+            *cam_height = MIN_HEIGHT;
+    }
 }
 
 /* Acceleration/braking on their own keys now, not sharing the d-pad
@@ -54,7 +74,7 @@ static void handle_throttle(float *speed, Uint8 const *keys)
 }
 
 static void handle_terminal_event(t_camera *cam, float *speed,
-        t_event event, int *runs)
+        float *cam_height, t_event event, int *runs)
 {
     if (event == EVENT_NONE)
         return ;
@@ -65,6 +85,7 @@ static void handle_terminal_event(t_camera *cam, float *speed,
     *runs = *runs + 1;
     camera_init(cam, 0.0f, 0.0f, 0.0f);
     *speed = 0.0f;
+    *cam_height = 0.0f;
 }
 
 int main(int argc, char **argv)
@@ -81,6 +102,7 @@ int main(int argc, char **argv)
     int             running;
     int             runs;
     float           speed;
+    float           cam_height;
 
     if (argc < 2) {
         tci_printf("usage: %s <road_file>\n", argv[0]);
@@ -109,6 +131,7 @@ int main(int argc, char **argv)
     }
     camera_init(&cam, 0.0f, 0.0f, 0.0f);
     speed = 0.0f;
+    cam_height = 0.0f;
     runs = 1;
     running = 1;
     while (running) {
@@ -121,16 +144,17 @@ int main(int argc, char **argv)
         }
         keys = SDL_GetKeyboardState(NULL);
         handle_steering(&cam, keys);
+        handle_altitude(&cam_height, keys);
         handle_throttle(&speed, keys);
         camera_move(&cam, speed);
-        handle_terminal_event(&cam, &speed,
-            road_check_collision(&road, &cam), &runs);
-        handle_terminal_event(&cam, &speed,
+        handle_terminal_event(&cam, &speed, &cam_height,
+            road_check_collision(&road, &cam, cam_height), &runs);
+        handle_terminal_event(&cam, &speed, &cam_height,
             road_check_finish(&road, &cam), &runs);
         render_backdrop(ren);
-        render_markers(&cam, ren, marker_tex);
-        render_road(&road, &cam, ren, sprites);
-        render_player(ren, player_tex);
+        render_markers(&cam, cam_height, ren, marker_tex);
+        render_road(&road, &cam, cam_height, ren, sprites);
+        render_player(ren, player_tex, cam_height);
         SDL_RenderPresent(ren);
         SDL_Delay(16);
     }

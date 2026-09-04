@@ -139,19 +139,33 @@ int main(void)
     /* driving straight at the first obstacle (15, 0) with no steering
      * runs right into it -- the case that forces the first dodge. */
     camera_init(&cam, 15.0f, 0.0f, 0.0f);
-    check_int("standing on an obstacle is a collision",
-        road_check_collision(&road, &cam), EVENT_DIED);
+    check_int("standing on an obstacle at ground height is a collision",
+        road_check_collision(&road, &cam, 0.0f), EVENT_DIED);
 
     /* a little short of COLLISION_DIST away is still a miss -- the
      * radius is a real boundary, not a generous fudge factor. */
     camera_init(&cam, 15.0f, 2.0f, 0.0f);
     check_int("2.0 world units off an obstacle is not a collision",
-        road_check_collision(&road, &cam), EVENT_NONE);
+        road_check_collision(&road, &cam, 0.0f), EVENT_NONE);
 
     /* the open road between obstacles is always clear. */
     camera_init(&cam, 22.0f, 0.0f, 0.0f);
     check_int("mid-road between obstacles is not a collision",
-        road_check_collision(&road, &cam), EVENT_NONE);
+        road_check_collision(&road, &cam, 0.0f), EVENT_NONE);
+
+    /* flying at or above OBSTACLE_HEIGHT clears the same obstacle
+     * that would otherwise be a certain crash -- the actual dodge
+     * Space Harrier's own up/down axis is for. */
+    camera_init(&cam, 15.0f, 0.0f, 0.0f);
+    check_int("flying above OBSTACLE_HEIGHT clears an obstacle",
+        road_check_collision(&road, &cam, OBSTACLE_HEIGHT), EVENT_NONE);
+
+    /* just under the threshold is still a real crash -- climbing
+     * has to actually clear the obstacle, not just approach it. */
+    camera_init(&cam, 15.0f, 0.0f, 0.0f);
+    check_int("just under OBSTACLE_HEIGHT is still a collision",
+        road_check_collision(&road, &cam, OBSTACLE_HEIGHT - 0.1f),
+        EVENT_DIED);
 
     /* short of the finish line, still racing. */
     camera_init(&cam, 60.0f, 0.0f, 0.0f);

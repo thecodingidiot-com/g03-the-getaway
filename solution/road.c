@@ -89,12 +89,15 @@ int road_load(t_road *road, char const *path)
     return (1);
 }
 
-t_event road_check_collision(t_road const *road, t_camera const *cam)
+t_event road_check_collision(t_road const *road, t_camera const *cam,
+        float cam_height)
 {
     t_vec2  diff;
     float   dist;
     int     i;
 
+    if (cam_height >= OBSTACLE_HEIGHT)
+        return (EVENT_NONE);
     i = 0;
     while (i < road->count) {
         diff = vec2_sub(cam->pos, road->obstacles[i].pos);
