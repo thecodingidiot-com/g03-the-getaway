@@ -1,4 +1,5 @@
 *.o
+*.d
 solution/getaway
 solution/libtci/*.a
 solution/assets/
