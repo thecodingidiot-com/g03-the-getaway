@@ -43,12 +43,16 @@ r01/r02 already built.
   sprite_id`), loaded with `libtci`'s `tci_getline`/`tci_atoi` — this
   is g-tier, not r-tier, so it's `libtci` again, not raw `fopen`.
 - Real collision: driving within `COLLISION_DIST` world units of an
-  obstacle ends the run. Reaching `finish_dist` world units from the
-  start wins it.
+  obstacle, at or below `OBSTACLE_HEIGHT`, ends the run. Reaching
+  `finish_dist` world units from the start wins it regardless of
+  altitude.
 - Steering shifts world position directly (`cam->right`, never
   rotated) instead of turning the camera — the same model Hang-On,
   Out Run, and Space Harrier all use, not a raycaster's rotate-then-
   move. Acceleration/braking have their own keys, off the d-pad.
+- A real altitude axis: climbing above `OBSTACLE_HEIGHT` clears every
+  obstacle on the course, the actual dodge Space Harrier's own up/down
+  stick is for. A direct positional step, not ramped like throttle.
 - A visible player craft drawn at a fixed screen position, and
   scattered background decoration reusing the same projection — same
   technique, applied to feel and readability instead of new math.
@@ -86,8 +90,9 @@ make re
 ```
 
 Controls: Left/Right arrows or `h`/`l` to steer (a direct sideways
-shift, not a turn — the camera always faces forward), Space to
-accelerate, Shift to brake, Escape or `q` to quit.
+shift, not a turn — the camera always faces forward), Up/Down arrows
+or `k`/`j` to climb/descend, Space to accelerate, Shift to brake,
+Escape or `q` to quit.
 
 `gen_assets.sh` needs Python3 + Pillow:
 
@@ -110,12 +115,15 @@ asserting real outcomes against `fixtures/road1.txt`:
 - Standing on an obstacle is a collision; a couple of world units off
   it is not.
 - The open road between obstacles never falsely reports a collision.
+- Flying at or above `OBSTACLE_HEIGHT` clears an obstacle that would
+  otherwise be a certain collision; just under that height still
+  isn't enough.
 - Reaching the finish distance wins the run; short of it does not.
 
 **`getaway`** — runs its event loop for two seconds under a headless
 (`SDL_VIDEODRIVER=dummy`) video driver without crashing. A smoke test,
 not a visual check — actually driving the road, dodging obstacles by
-steering, is done by running it yourself.
+steering or altitude, is done by running it yourself.
 
 ---
 
