@@ -31,8 +31,11 @@ All tests must pass before the chapter is complete.
 
 Building `getaway` independently? Here is the full project brief.
 
-A dodge-and-survive road run, built entirely on r01/r02's scaler
-technique — no new rendering math, only what a real game does with it:
+A dodge-and-survive run across open ground, built entirely on r01/r02's
+scaler technique — no new rendering math, only what a real game does
+with it. No road, no lanes: obstacles scale in against open ground,
+the same framing Space Harrier used on the same class of hardware
+r01/r02 already built.
 
 - `vec2.c`, `camera.c`, and `scaler.c` ported unchanged from r01 — the
   same `forward`/`right` camera, the same `WINDOW_H / depth` scaler.
@@ -42,6 +45,10 @@ technique — no new rendering math, only what a real game does with it:
 - Real collision: driving within `COLLISION_DIST` world units of an
   obstacle ends the run. Reaching `finish_dist` world units from the
   start wins it.
+- Acceleration/braking instead of a fixed speed, a visible player
+  craft drawn at a fixed screen position, and scattered background
+  decoration reusing the same projection — same technique, applied to
+  feel and readability instead of new math.
 - No score, no HUD, no audio — outcomes print to the terminal and the
   run restarts. Art and sound are a later part of this curriculum, not
   this chapter's job.
@@ -76,7 +83,7 @@ make re
 ```
 
 Controls: Left/Right arrows or `h`/`l` to turn, Up/Down arrows or
-`k`/`j` to drive forward/backward, Escape or `q` to quit.
+`k`/`j` to accelerate/brake, Escape or `q` to quit.
 
 `gen_assets.sh` needs Python3 + Pillow:
 
