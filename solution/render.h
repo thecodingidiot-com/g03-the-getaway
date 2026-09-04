@@ -10,7 +10,7 @@
 # define MARKER_SCALE       0.3f
 # define PLAYER_SPRITE_W    120
 # define PLAYER_SPRITE_H    72
-# define HEIGHT_SHIFT_SCALE 0.15f
+# define HEIGHT_SHIFT_SCALE 0.3f
 # define PLAYER_PX_PER_UNIT 30
 # define SHOT_SCALE         0.2f
 
