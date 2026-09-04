@@ -3,6 +3,7 @@
 #include "libtci.h"
 #include "camera.h"
 #include "scaler.h"
+#include "shot.h"
 #include "road.h"
 #include "render.h"
 
@@ -88,9 +89,29 @@ static void handle_throttle(float *speed, Uint8 const *keys)
     }
 }
 
-static void handle_terminal_event(t_camera *cam, float *speed,
-        float *cam_height, float *tilt, t_event event, int *runs)
+/* Ctrl fires, on its own cooldown -- not tied to the frame rate the
+** way a single SDL_KEYDOWN event would be, so holding it down fires
+** repeatedly at a fixed pace instead of once. shot_fire() itself
+** doesn't know or care what's about to fire on it; it just claims the
+** first free slot in the pool. */
+static void handle_fire(t_shot shots[MAX_SHOTS], int *cooldown,
+        t_camera const *cam, float cam_height, Uint8 const *keys)
 {
+    if (*cooldown > 0)
+        *cooldown = *cooldown - 1;
+    if ((keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL])
+            && *cooldown == 0) {
+        shot_fire(shots, cam->pos, cam_height);
+        *cooldown = FIRE_COOLDOWN;
+    }
+}
+
+static void handle_terminal_event(t_camera *cam, float *speed,
+        float *cam_height, float *tilt, t_road *road,
+        t_shot shots[MAX_SHOTS], t_event event, int *runs)
+{
+    int i;
+
     if (event == EVENT_NONE)
         return ;
     if (event == EVENT_DIED)
@@ -102,6 +123,12 @@ static void handle_terminal_event(t_camera *cam, float *speed,
     *speed = 0.0f;
     *cam_height = 0.0f;
     *tilt = 0.0f;
+    road_reset(road);
+    i = 0;
+    while (i < MAX_SHOTS) {
+        shots[i].active = 0;
+        i++;
+    }
 }
 
 int main(int argc, char **argv)
@@ -112,11 +139,15 @@ int main(int argc, char **argv)
     SDL_Texture     *sprites[SPRITE_COUNT];
     SDL_Texture     *marker_tex;
     SDL_Texture     *player_tex;
+    SDL_Texture     *shot_tex;
     t_road          road;
     t_camera        cam;
+    t_shot          shots[MAX_SHOTS];
     Uint8 const     *keys;
     int             running;
     int             runs;
+    int             fire_cooldown;
+    int             i;
     float           speed;
     float           cam_height;
     float           tilt;
@@ -141,7 +172,9 @@ int main(int argc, char **argv)
     sprites[1] = IMG_LoadTexture(ren, "assets/pillar.png");
     marker_tex = IMG_LoadTexture(ren, "assets/marker.png");
     player_tex = IMG_LoadTexture(ren, "assets/player.png");
-    if (!sprites[0] || !sprites[1] || !marker_tex || !player_tex) {
+    shot_tex = IMG_LoadTexture(ren, "assets/shot.png");
+    if (!sprites[0] || !sprites[1] || !marker_tex || !player_tex
+            || !shot_tex) {
         tci_printf("failed to load a sprite: %s\n", IMG_GetError());
         tci_printf("did you run 'bash gen_assets.sh' first?\n");
         return (1);
@@ -150,6 +183,12 @@ int main(int argc, char **argv)
     speed = 0.0f;
     cam_height = 0.0f;
     tilt = 0.0f;
+    fire_cooldown = 0;
+    i = 0;
+    while (i < MAX_SHOTS) {
+        shots[i].active = 0;
+        i++;
+    }
     runs = 1;
     running = 1;
     while (running) {
@@ -164,14 +203,18 @@ int main(int argc, char **argv)
         handle_steering(&cam, &tilt, keys);
         handle_altitude(&cam_height, keys);
         handle_throttle(&speed, keys);
+        handle_fire(shots, &fire_cooldown, &cam, cam_height, keys);
         camera_move(&cam, speed);
-        handle_terminal_event(&cam, &speed, &cam_height, &tilt,
+        shot_update(shots);
+        road_check_shots(&road, shots);
+        handle_terminal_event(&cam, &speed, &cam_height, &tilt, &road, shots,
             road_check_collision(&road, &cam, cam_height), &runs);
-        handle_terminal_event(&cam, &speed, &cam_height, &tilt,
+        handle_terminal_event(&cam, &speed, &cam_height, &tilt, &road, shots,
             road_check_finish(&road, &cam), &runs);
         render_backdrop(ren);
         render_markers(&cam, cam_height, ren, marker_tex);
         render_road(&road, &cam, cam_height, ren, sprites);
+        render_shots(shots, &cam, ren, shot_tex);
         render_player(ren, player_tex, cam_height, tilt);
         SDL_RenderPresent(ren);
         SDL_Delay(16);
@@ -180,6 +223,7 @@ int main(int argc, char **argv)
     SDL_DestroyTexture(sprites[1]);
     SDL_DestroyTexture(marker_tex);
     SDL_DestroyTexture(player_tex);
+    SDL_DestroyTexture(shot_tex);
     SDL_DestroyRenderer(ren);
     SDL_DestroyWindow(win);
     IMG_Quit();

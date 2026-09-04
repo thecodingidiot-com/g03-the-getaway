@@ -3,6 +3,7 @@
 
 # include "vec2.h"
 # include "camera.h"
+# include "shot.h"
 
 # define MAX_OBSTACLES      64
 # define COLLISION_DIST     1.2f
@@ -21,6 +22,7 @@ typedef struct s_obstacle
 {
     t_vec2  pos;
     int     sprite_id;
+    int     destroyed;
 }   t_obstacle;
 
 typedef struct s_road
@@ -34,5 +36,7 @@ int     road_load(t_road *road, char const *path);
 t_event road_check_collision(t_road const *road, t_camera const *cam,
             float cam_height);
 t_event road_check_finish(t_road const *road, t_camera const *cam);
+void    road_check_shots(t_road *road, t_shot shots[MAX_SHOTS]);
+void    road_reset(t_road *road);
 
 #endif
