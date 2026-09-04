@@ -198,6 +198,16 @@ int main(void)
             shots[0].active, 0);
         check_int("map_check_shots() returns exactly one hit",
             total_hits, 1);
+        check_int("a hit starts its obstacle's flash timer",
+            map.obstacles[0].flash_timer, FLASH_DURATION);
+        j = 0;
+        while (j < FLASH_DURATION)
+        {
+            map_tick_flashes(&map);
+            j++;
+        }
+        check_int("map_tick_flashes() counts the flash timer down to zero",
+            map.obstacles[0].flash_timer, 0);
     }
 
     /* a destroyed obstacle stops colliding with the camera too --

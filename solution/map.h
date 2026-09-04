@@ -13,12 +13,14 @@
 # define MAX_HEIGHT         3.5f
 # define MIN_SIDE           -6.0f
 # define MAX_SIDE           6.0f
+# define FLASH_DURATION     6
 
 typedef struct s_obstacle
 {
     t_vec2  pos;
     int     sprite_id;
     int     destroyed;
+    int     flash_timer;
 }   t_obstacle;
 
 typedef struct s_map
@@ -33,6 +35,7 @@ t_event map_check_collision(t_map const *map, t_camera const *cam,
             float cam_height);
 t_event map_check_finish(t_map const *map, t_camera const *cam);
 int     map_check_shots(t_map *map, t_shot shots[MAX_SHOTS]);
+void    map_tick_flashes(t_map *map);
 void    map_reset(t_map *map);
 
 #endif

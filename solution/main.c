@@ -251,6 +251,7 @@ int main(int argc, char **argv)
                 audio_play_sfx(&audio, EVENT_HIT);
                 hits--;
             }
+            map_tick_flashes(&map);
             if (handle_terminal_event(&cam, &cam_height, &tilt, &map, shots,
                     &audio, map_check_collision(&map, &cam, cam_height),
                     &runs, &lives))
