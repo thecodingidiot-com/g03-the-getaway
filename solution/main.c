@@ -135,6 +135,7 @@ int main(int argc, char **argv)
     int             running;
     int             runs;
     int             fire_cooldown;
+    int             hits;
     int             i;
     float           cam_height;
     float           tilt;
@@ -197,7 +198,11 @@ int main(int argc, char **argv)
             handle_fire(shots, &fire_cooldown, &cam, cam_height, keys));
         camera_move(&cam, FORWARD_SPEED);
         shot_update(shots);
-        map_check_shots(&map, shots);
+        hits = map_check_shots(&map, shots);
+        while (hits > 0) {
+            audio_play_sfx(&audio, EVENT_HIT);
+            hits--;
+        }
         handle_terminal_event(&cam, &cam_height, &tilt, &map, shots, &audio,
             map_check_collision(&map, &cam, cam_height), &runs);
         handle_terminal_event(&cam, &cam_height, &tilt, &map, shots, &audio,

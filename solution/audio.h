@@ -7,6 +7,7 @@
 typedef struct s_audio
 {
     Mix_Chunk   *sfx_shoot;
+    Mix_Chunk   *sfx_hit;
     Mix_Chunk   *sfx_crash;
 }   t_audio;
 

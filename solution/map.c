@@ -128,14 +128,22 @@ t_event map_check_finish(t_map const *map, t_camera const *cam)
 ** idea) and "what counts as a hit" (this game's own rule). A shot
 ** that's flying above OBSTACLE_HEIGHT misses everything at ground
 ** level for the same reason the player does at that height: nothing
-** here can hit what it's already flying clear over. */
-void    map_check_shots(t_map *map, t_shot shots[MAX_SHOTS])
+** here can hit what it's already flying clear over.
+**
+** Returns how many obstacles were destroyed this call, not a single
+** t_event -- a burst can hit more than one obstacle in the same
+** frame, and map.c still can't call into audio.c to say so itself
+** (no SDL2 or SDL2_mixer here, ever). The caller plays one hit sound
+** per count instead. */
+int     map_check_shots(t_map *map, t_shot shots[MAX_SHOTS])
 {
     t_vec2  diff;
     float   dist;
+    int     hits;
     int     i;
     int     j;
 
+    hits = 0;
     i = 0;
     while (i < MAX_SHOTS) {
         if (shots[i].active && shots[i].height < OBSTACLE_HEIGHT) {
@@ -147,6 +155,7 @@ void    map_check_shots(t_map *map, t_shot shots[MAX_SHOTS])
                     if (dist < SHOT_HIT_DIST) {
                         map->obstacles[j].destroyed = 1;
                         shots[i].active = 0;
+                        hits++;
                     }
                 }
                 j++;
@@ -154,6 +163,7 @@ void    map_check_shots(t_map *map, t_shot shots[MAX_SHOTS])
         }
         i++;
     }
+    return (hits);
 }
 
 /* Every obstacle destroyed this run comes back for the next one --

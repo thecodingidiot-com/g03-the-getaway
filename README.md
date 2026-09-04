@@ -67,9 +67,13 @@ r01/r02 already built.
   colliding and stops rendering; `map_reset()` restores every one of
   them for the next run, the same reason `camera_init()` resets
   position.
-- Two sound effects — a shot and a crash — the only audio this chapter
-  adds. No score, no HUD, no music yet; those are still a later part
-  of this curriculum.
+- Horizontal ground stripes receding toward the horizon, reusing
+  `scaler_project()`'s own size growth applied downward instead of
+  upward — a smaller, honest stand-in for the real cabinet's own
+  moving-scanline floor, not a new rendering technique.
+- Three sound effects — a shot, a hit, and a crash — the only audio
+  this chapter adds. No score, no HUD, no music yet; those are still
+  a later part of this curriculum.
 
 Source is split by concern, one file per module:
 
@@ -83,7 +87,7 @@ Source is split by concern, one file per module:
 | `shot.c` / `shot.h` | a generic projectile pool — fire, advance, age out — knows nothing about obstacles at all, no SDL2 anywhere |
 | `render.c` / `render.h` | the only file that calls actual SDL2 drawing functions |
 | `audio.c` / `audio.h` | **new** — the only file that calls actual SDL2_mixer functions |
-| `event.h` | **new** — the shared `t_event` enum, now carrying `EVENT_FIRED` alongside `EVENT_DIED`/`EVENT_WON` |
+| `event.h` | **new** — the shared `t_event` enum: `EVENT_FIRED`, `EVENT_HIT`, `EVENT_DIED`, `EVENT_WON` |
 
 `vec2.c`, `camera.c`, `scaler.c`, `map.c`, and `shot.c` never call an
 SDL2 (or SDL2_mixer) function, so they link into a test binary with
@@ -119,8 +123,8 @@ is named after.
 sudo apt install python3-pil libsdl2-mixer-dev
 ```
 
-Both sound effects are synthesized locally by `gen_audio.sh` — own-
-work square/sweep waves, not sourced from anywhere — so there is
+All three sound effects are synthesized locally by `gen_audio.sh` —
+own-work square/sweep waves, not sourced from anywhere — so there is
 nothing to attribute and no license file for `assets/*.wav` beyond
 this repository's own MIT license.
 
@@ -143,10 +147,11 @@ SDL2 or SDL2_mixer at all, asserting real outcomes against
 - Flying at or above `OBSTACLE_HEIGHT` clears an obstacle that would
   otherwise be a certain collision; just under that height still
   isn't enough.
-- A shot that reaches an obstacle destroys it and deactivates itself;
-  a destroyed obstacle stops colliding; `map_reset()` restores it.
+- A shot that reaches an obstacle destroys it, deactivates itself, and
+  counts as exactly one hit; a destroyed obstacle stops colliding;
+  `map_reset()` restores it.
 - A shot fired from above `OBSTACLE_HEIGHT` flies over an obstacle,
-  same as the player would.
+  same as the player would, and scores no hit.
 - Reaching the finish distance wins the run; short of it does not.
 
 **`getaway`** — runs its event loop for two seconds under a headless

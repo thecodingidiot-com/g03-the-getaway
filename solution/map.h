@@ -32,7 +32,7 @@ int     map_load(t_map *map, char const *path);
 t_event map_check_collision(t_map const *map, t_camera const *cam,
             float cam_height);
 t_event map_check_finish(t_map const *map, t_camera const *cam);
-void    map_check_shots(t_map *map, t_shot shots[MAX_SHOTS]);
+int     map_check_shots(t_map *map, t_shot shots[MAX_SHOTS]);
 void    map_reset(t_map *map);
 
 #endif
