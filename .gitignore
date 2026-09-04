@@ -1,0 +1,4 @@
+*.o
+solution/getaway
+solution/libtci/*.a
+solution/assets/
