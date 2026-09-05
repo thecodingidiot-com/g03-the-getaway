@@ -118,19 +118,25 @@ static void render_checker_row(SDL_Renderer *ren, int top, int bottom,
 ** become the *top* of the next, nearer row's band -- a chequerboard
 ** tiles edge to edge with no gap between rows, unlike a thin stripe
 ** drawn at one fixed thickness regardless of how far the next row is.
-** The last (nearest) row's own bottom edge is very rarely exactly
-** WINDOW_H, so one final call fills whatever's left down to it. */
+**
+** CHECKER_MAX_SIZE caps `size` the same way cap_projection() already
+** caps a billboard's -- without it, the nearest row's cells would
+** grow without bound and swallow the whole screen in one or two giant
+** squares instead of reading as perspective at all. The real cabinet
+** doesn't chequer all the way to the bottom edge either: once the cap
+** stops the pattern advancing, whatever's left between there and
+** WINDOW_H is one plain fill, not more (unreadably huge) cells. */
 void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
 {
     t_projection    proj;
     t_vec2          far_point;
-    float           last_size;
+    SDL_Rect        solid;
+    float           size;
     int             prev_y;
     int             row_y;
     int             i;
 
     prev_y = HORIZON_Y;
-    last_size = 0.0f;
     i = STRIPE_COUNT - 1;
     while (i >= 0) {
         far_point.x = cam->pos.x + STRIPE_SPACING
@@ -138,16 +144,25 @@ void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
         far_point.y = cam->pos.y;
         proj = scaler_project(cam, far_point);
         if (proj.visible) {
-            row_y = HORIZON_Y + (int)((float)proj.size * STRIPE_Y_SCALE);
+            size = (float)proj.size;
+            if (size > CHECKER_MAX_SIZE)
+                size = CHECKER_MAX_SIZE;
+            row_y = HORIZON_Y + (int)(size * STRIPE_Y_SCALE);
             if (row_y > WINDOW_H)
                 row_y = WINDOW_H;
-            render_checker_row(ren, prev_y, row_y, (float)proj.size, i);
+            render_checker_row(ren, prev_y, row_y, size, i);
             prev_y = row_y;
-            last_size = (float)proj.size;
         }
         i--;
     }
-    render_checker_row(ren, prev_y, WINDOW_H, last_size, -1);
+    if (prev_y < WINDOW_H) {
+        solid.x = 0;
+        solid.y = prev_y;
+        solid.w = WINDOW_W;
+        solid.h = WINDOW_H - prev_y;
+        SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
+        SDL_RenderFillRect(ren, &solid);
+    }
 }
 
 /* h = WINDOW_H / depth grows without bound as depth shrinks -- close

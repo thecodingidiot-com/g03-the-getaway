@@ -17,8 +17,9 @@
 # define STRIPE_SPACING     6.0f
 # define STRIPE_COUNT       14
 # define STRIPE_Y_SCALE     0.5f
-# define CHECKER_CELL_S     1.0f
-# define CHECKER_MAX_COLUMNS 80
+# define CHECKER_CELL_S     0.5f
+# define CHECKER_MAX_COLUMNS 160
+# define CHECKER_MAX_SIZE    220.0f
 
 void    render_backdrop(SDL_Renderer *ren);
 void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren);
