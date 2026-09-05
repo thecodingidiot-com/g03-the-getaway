@@ -19,6 +19,8 @@
 # define STRIPE_Y_SCALE     0.5f
 # define STRIPE_THICKNESS_SCALE 0.05f
 # define STRIPE_MAX_THICKNESS   36
+# define CHECKER_HALF_S     3.0f
+# define CHECKER_COLUMNS    6
 
 void    render_backdrop(SDL_Renderer *ren);
 void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren);

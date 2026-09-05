@@ -70,13 +70,27 @@ void    render_backdrop(SDL_Renderer *ren)
 ** through the current cycle" idea a clock face uses, so a stripe
 ** slides continuously toward the camera and off the near plane
 ** instead of jumping there. The next one behind it is already
-** sliding in from the horizon; nothing is ever reset or respawned. */
+** sliding in from the horizon; nothing is ever reset or respawned.
+**
+** The real cabinet also stripes its centre differently from its
+** sides -- a converging chequerboard pointing at the horizon, not a
+** plain band. `scaler_project()`'s own `side`-to-`screen_x` formula
+** already answers "how wide is CHECKER_HALF_S world units either side
+** of dead ahead, at this depth" -- WINDOW_H * side / depth, the exact
+** same division used for a billboard's own screen_x. That width
+** narrows toward the horizon on its own, with no extra math: the
+** chequerboard converges because the same formula that scales a
+** billboard's position already converges too. */
 void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
 {
     t_projection    proj;
     t_vec2          far_point;
     SDL_Rect        band;
+    SDL_Rect        cell;
     int             thickness;
+    int             half_width;
+    int             cell_w;
+    int             col;
     int             i;
 
     i = 0;
@@ -85,7 +99,7 @@ void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
             - fmodf(cam->pos.x, STRIPE_SPACING) + (float)i * STRIPE_SPACING;
         far_point.y = cam->pos.y;
         proj = scaler_project(cam, far_point);
-        if (proj.visible && i % 2 == 0) {
+        if (proj.visible) {
             band.y = HORIZON_Y + (int)((float)proj.size * STRIPE_Y_SCALE);
             thickness = (int)((float)proj.size * STRIPE_THICKNESS_SCALE);
             if (thickness > STRIPE_MAX_THICKNESS)
@@ -93,11 +107,33 @@ void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
             if (thickness < 1)
                 thickness = 1;
             if (band.y < WINDOW_H) {
-                band.x = 0;
-                band.w = WINDOW_W;
-                band.h = thickness;
-                SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
-                SDL_RenderFillRect(ren, &band);
+                if (i % 2 == 0) {
+                    band.x = 0;
+                    band.w = WINDOW_W;
+                    band.h = thickness;
+                    SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
+                    SDL_RenderFillRect(ren, &band);
+                }
+                half_width = (int)((float)WINDOW_H * CHECKER_HALF_S
+                        / proj.depth);
+                if (half_width > WINDOW_W / 2)
+                    half_width = WINDOW_W / 2;
+                cell_w = (2 * half_width) / CHECKER_COLUMNS;
+                if (cell_w < 1)
+                    cell_w = 1;
+                col = 0;
+                while (col < CHECKER_COLUMNS) {
+                    cell.x = WINDOW_W / 2 - half_width + col * cell_w;
+                    cell.y = band.y;
+                    cell.w = cell_w;
+                    cell.h = thickness;
+                    if ((i + col) % 2 == 0)
+                        SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
+                    else
+                        SDL_SetRenderDrawColor(ren, 0x1c, 0x15, 0x26, 0xff);
+                    SDL_RenderFillRect(ren, &cell);
+                    col++;
+                }
             }
         }
         i++;
