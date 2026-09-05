@@ -57,6 +57,48 @@ void    render_backdrop(SDL_Renderer *ren)
     SDL_RenderFillRect(ren, &ground);
 }
 
+/* One row of the chequerboard, top to bottom edge to edge -- no gaps
+** either side of a cell, unlike a thin stripe drawn at one fixed
+** thickness. `size` sets both how wide each cell is here (bigger,
+** the same WINDOW_H / depth growth every billboard already gets
+** scaled by) and how many are needed to reach the screen edge: few,
+** wide cells up close, many, thin ones near the horizon, with no
+** separate case for either -- the same division just keeps dividing.
+** `row_parity` alternates which colour starts each row, so columns
+** and rows both check like an actual board, not only one axis. */
+static void render_checker_row(SDL_Renderer *ren, int top, int bottom,
+        float size, int row_parity)
+{
+    SDL_Rect    cell;
+    int         k;
+    int         x0;
+    int         x1;
+
+    if (bottom <= top || size <= 0.0f)
+        return ;
+    cell.y = top;
+    cell.h = bottom - top;
+    k = -CHECKER_MAX_COLUMNS;
+    while (k < CHECKER_MAX_COLUMNS) {
+        x0 = WINDOW_W / 2 + (int)(size * (float)k * CHECKER_CELL_S);
+        if (x0 >= WINDOW_W)
+            break;
+        x1 = WINDOW_W / 2 + (int)(size * (float)(k + 1) * CHECKER_CELL_S);
+        if (x1 > 0) {
+            cell.x = (x0 < 0) ? 0 : x0;
+            cell.w = ((x1 > WINDOW_W) ? WINDOW_W : x1) - cell.x;
+            if (cell.w > 0) {
+                if ((row_parity + k) & 1)
+                    SDL_SetRenderDrawColor(ren, 0x1c, 0x15, 0x26, 0xff);
+                else
+                    SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
+                SDL_RenderFillRect(ren, &cell);
+            }
+        }
+        k++;
+    }
+}
+
 /* Space Harrier's own real floor is a moving scanline surface -- a
 ** different, larger technique this chapter still doesn't attempt.
 ** This reuses the one already here instead: scaler_project()'s own
@@ -67,77 +109,45 @@ void    render_backdrop(SDL_Renderer *ren)
 **
 ** STRIPE_SPACING world units apart, STRIPE_COUNT of them, each one's
 ** depth wrapping through cam->pos.x with fmodf() -- the same "how far
-** through the current cycle" idea a clock face uses, so a stripe
-** slides continuously toward the camera and off the near plane
-** instead of jumping there. The next one behind it is already
-** sliding in from the horizon; nothing is ever reset or respawned.
+** through the current cycle" idea a clock face uses, so a row slides
+** continuously toward the camera and off the near plane instead of
+** jumping there. The next one behind it is already sliding in from
+** the horizon; nothing is ever reset or respawned.
 **
-** The real cabinet also stripes its centre differently from its
-** sides -- a converging chequerboard pointing at the horizon, not a
-** plain band. `scaler_project()`'s own `side`-to-`screen_x` formula
-** already answers "how wide is CHECKER_HALF_S world units either side
-** of dead ahead, at this depth" -- WINDOW_H * side / depth, the exact
-** same division used for a billboard's own screen_x. That width
-** narrows toward the horizon on its own, with no extra math: the
-** chequerboard converges because the same formula that scales a
-** billboard's position already converges too. */
+** Rows are walked farthest first specifically so each one's own y can
+** become the *top* of the next, nearer row's band -- a chequerboard
+** tiles edge to edge with no gap between rows, unlike a thin stripe
+** drawn at one fixed thickness regardless of how far the next row is.
+** The last (nearest) row's own bottom edge is very rarely exactly
+** WINDOW_H, so one final call fills whatever's left down to it. */
 void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
 {
     t_projection    proj;
     t_vec2          far_point;
-    SDL_Rect        band;
-    SDL_Rect        cell;
-    int             thickness;
-    int             half_width;
-    int             cell_w;
-    int             col;
+    float           last_size;
+    int             prev_y;
+    int             row_y;
     int             i;
 
-    i = 0;
-    while (i < STRIPE_COUNT) {
+    prev_y = HORIZON_Y;
+    last_size = 0.0f;
+    i = STRIPE_COUNT - 1;
+    while (i >= 0) {
         far_point.x = cam->pos.x + STRIPE_SPACING
             - fmodf(cam->pos.x, STRIPE_SPACING) + (float)i * STRIPE_SPACING;
         far_point.y = cam->pos.y;
         proj = scaler_project(cam, far_point);
         if (proj.visible) {
-            band.y = HORIZON_Y + (int)((float)proj.size * STRIPE_Y_SCALE);
-            thickness = (int)((float)proj.size * STRIPE_THICKNESS_SCALE);
-            if (thickness > STRIPE_MAX_THICKNESS)
-                thickness = STRIPE_MAX_THICKNESS;
-            if (thickness < 1)
-                thickness = 1;
-            if (band.y < WINDOW_H) {
-                if (i % 2 == 0) {
-                    band.x = 0;
-                    band.w = WINDOW_W;
-                    band.h = thickness;
-                    SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
-                    SDL_RenderFillRect(ren, &band);
-                }
-                half_width = (int)((float)WINDOW_H * CHECKER_HALF_S
-                        / proj.depth);
-                if (half_width > WINDOW_W / 2)
-                    half_width = WINDOW_W / 2;
-                cell_w = (2 * half_width) / CHECKER_COLUMNS;
-                if (cell_w < 1)
-                    cell_w = 1;
-                col = 0;
-                while (col < CHECKER_COLUMNS) {
-                    cell.x = WINDOW_W / 2 - half_width + col * cell_w;
-                    cell.y = band.y;
-                    cell.w = cell_w;
-                    cell.h = thickness;
-                    if ((i + col) % 2 == 0)
-                        SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
-                    else
-                        SDL_SetRenderDrawColor(ren, 0x1c, 0x15, 0x26, 0xff);
-                    SDL_RenderFillRect(ren, &cell);
-                    col++;
-                }
-            }
+            row_y = HORIZON_Y + (int)((float)proj.size * STRIPE_Y_SCALE);
+            if (row_y > WINDOW_H)
+                row_y = WINDOW_H;
+            render_checker_row(ren, prev_y, row_y, (float)proj.size, i);
+            prev_y = row_y;
+            last_size = (float)proj.size;
         }
-        i++;
+        i--;
     }
+    render_checker_row(ren, prev_y, WINDOW_H, last_size, -1);
 }
 
 /* h = WINDOW_H / depth grows without bound as depth shrinks -- close
