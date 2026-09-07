@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "render.h"
+#include "stripes.h"
 #include "scaler.h"
 
 typedef struct s_draw_item
@@ -59,44 +60,37 @@ void    render_backdrop(SDL_Renderer *ren)
 
 /* Space Harrier's own real floor is a moving scanline surface -- a
 ** different, larger technique this chapter still doesn't attempt.
-** This reuses the one already here instead: scaler_project()'s own
-** `size` field, the same WINDOW_H / depth growth every billboard is
-** scaled by, applied downward from HORIZON_Y instead of upward --
-** ground recedes into the horizon exactly as fast as a billboard at
-** the same depth grows, because it's the same division.
+** This fills the ground with alternating bands instead: one filled rect
+** between consecutive marked depths, every other one left as bare
+** ground. stripes.h has the measurements that chose the spacing.
 **
-** STRIPE_SPACING world units apart, STRIPE_COUNT of them, each one's
-** depth wrapping through cam->pos.x with fmodf() -- the same "how far
-** through the current cycle" idea a clock face uses, so a stripe
-** slides continuously toward the camera and off the near plane
-** instead of jumping there. The next one behind it is already
-** sliding in from the horizon; nothing is ever reset or respawned. */
+** The band's far edge is the row for depth i, its near edge the row for
+** depth i+1; both come from stripes_row(), so the whole pattern sits on
+** one definition of where the ground is. */
 void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
 {
-    t_projection    proj;
-    t_vec2          far_point;
-    SDL_Rect        band;
-    int             thickness;
-    int             i;
+    SDL_Rect    band;
+    float       near_depth;
+    float       far_depth;
+    int         y_near;
+    int         y_far;
+    int         i;
 
+    SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
     i = 0;
-    while (i < STRIPE_COUNT) {
-        far_point.x = cam->pos.x + STRIPE_SPACING
-            - fmodf(cam->pos.x, STRIPE_SPACING) + (float)i * STRIPE_SPACING;
-        far_point.y = cam->pos.y;
-        proj = scaler_project(cam, far_point);
-        if (proj.visible && i % 2 == 0) {
-            band.y = HORIZON_Y + (int)((float)proj.size * STRIPE_Y_SCALE);
-            thickness = (int)((float)proj.size * STRIPE_THICKNESS_SCALE);
-            if (thickness > STRIPE_MAX_THICKNESS)
-                thickness = STRIPE_MAX_THICKNESS;
-            if (thickness < 1)
-                thickness = 1;
-            if (band.y < WINDOW_H) {
+    while (i < STRIPE_COUNT - 1) {
+        near_depth = stripes_edge_depth(cam->pos.x, i);
+        far_depth = near_depth + STRIPE_SPACING;
+        if (near_depth >= NEAR_PLANE && i % 2 == 0) {
+            y_near = stripes_row(near_depth);
+            y_far = stripes_row(far_depth);
+            if (y_near > WINDOW_H)
+                y_near = WINDOW_H;
+            if (y_near > y_far) {
                 band.x = 0;
+                band.y = y_far;
                 band.w = WINDOW_W;
-                band.h = thickness;
-                SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
+                band.h = y_near - y_far;
                 SDL_RenderFillRect(ren, &band);
             }
         }

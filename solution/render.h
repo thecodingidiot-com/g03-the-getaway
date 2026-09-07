@@ -14,11 +14,6 @@
 # define HEIGHT_SHIFT_SCALE 0.3f
 # define PLAYER_PX_PER_UNIT 30
 # define SHOT_SCALE         0.2f
-# define STRIPE_SPACING     6.0f
-# define STRIPE_COUNT       14
-# define STRIPE_Y_SCALE     0.5f
-# define STRIPE_THICKNESS_SCALE 0.05f
-# define STRIPE_MAX_THICKNESS   36
 
 void    render_backdrop(SDL_Renderer *ren);
 void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren);

@@ -109,6 +109,7 @@ cat > "$WORK_DIR/test_logic.c" <<'TESTC'
 #include "shot.h"
 #include "map.h"
 #include "scaler.h"
+#include "stripes.h"
 
 static int  g_pass = 0;
 static int  g_fail = 0;
@@ -268,43 +269,54 @@ int main(void)
         map_check_finish(&map, &cam), EVENT_WON);
 
 
-    /* ── does the ground move at the speed you are moving? ─────────────────
+    /* ── is there ever anything to see moving? ────────────────────────
     **
-    ** render_ground_stripes() builds its stripes as a comb along world x:
+    ** The heading test that used to live here was wrong, and the commit
+    ** that added it says so now. It varied cam->angle -- a state this
+    ** game never reaches, because main.c steers by strafing and never
+    ** calls camera_turn(). forward is (1, 0) for the whole run.
     **
-    **     far_point.x = pos.x + SPACING - fmodf(pos.x, SPACING) + i * SPACING
-    **     far_point.y = pos.y
+    ** The real complaint is measurable. The near field -- screen rows
+    ** below 360, the 120 pixels closest to the viewer -- is where motion
+    ** reads. If nothing is drawn there, nothing appears to move, however
+    ** fast the camera is travelling.
     **
-    ** but the camera steers -- forward is cos/sin of cam->angle -- and the
-    ** projection measures depth along forward. So every stripe's depth is
-    ** its world spacing times cos(angle). Steer, and the ground appears to
-    ** rush at you faster, because the stripes have moved closer. Apparent
-    ** speed tracks your steering instead of your speed.
+    ** The old thin stripes put an average of 0.68 marks below row 360,
+    ** and none at all in 39 frames out of 120: six of the seven marks in
+    ** a typical frame landed in a ten-pixel smear at the horizon, because
+    ** 1/depth compresses everything past the first one into the same rows.
     **
-    ** The nearest stripe should sit one STRIPE_SPACING ahead whatever way
-    ** the car is pointed. */
-# define SPACING_COPY 6.0f
-
+    ** This walks a full cycle of the pattern and insists the near field
+    ** is never empty. */
     {
-        float   headings[3];
-        t_vec2  far_point;
-        t_projection proj;
-        int     h;
+        float   px;
+        float   near_depth;
+        float   far_depth;
+        int     covered;
+        int     empty_frames;
+        int     step;
+        int     i;
 
-        headings[0] = 0.0f;
-        headings[1] = 0.6f;
-        headings[2] = 1.0f;
-        h = 0;
-        while (h < 3) {
-            camera_init(&cam, 0.0f, 0.0f, headings[h]);
-            far_point.x = cam.pos.x + SPACING_COPY
-                - fmodf(cam.pos.x, SPACING_COPY);
-            far_point.y = cam.pos.y;
-            proj = scaler_project(&cam, far_point);
-            check_int("the nearest stripe is one spacing ahead at any heading",
-                (int)(proj.depth + 0.5f), (int)SPACING_COPY);
-            h++;
+        empty_frames = 0;
+        step = 0;
+        while (step < 120) {
+            px = (float)step * 0.05f;
+            covered = 0;
+            i = 0;
+            while (i < STRIPE_COUNT - 1) {
+                near_depth = stripes_edge_depth(px, i);
+                far_depth = near_depth + STRIPE_SPACING;
+                if (near_depth >= NEAR_PLANE && i % 2 == 0
+                    && stripes_row(near_depth) > 360)
+                    covered += stripes_row(near_depth) - stripes_row(far_depth);
+                i++;
+            }
+            if (covered == 0)
+                empty_frames++;
+            step++;
         }
+        check_int("the near field is never empty over a full cycle",
+            empty_frames, 0);
     }
 
     tci_printf("\n%d passed, %d failed\n", g_pass, g_fail);
@@ -313,14 +325,14 @@ int main(void)
 TESTC
 
 logic_build_log=$(gcc -Wall -Wextra -I libtci -I . -c "$WORK_DIR/test_logic.c" -o "$WORK_DIR/test_logic.o" 2>&1 \
-    && gcc "$WORK_DIR/test_logic.o" vec2.o camera.o scaler.o map.o shot.o libtci/libtci.a -lm -o "$WORK_DIR/test_logic" 2>&1)
+    && gcc "$WORK_DIR/test_logic.o" vec2.o camera.o scaler.o stripes.o map.o shot.o libtci/libtci.a -lm -o "$WORK_DIR/test_logic" 2>&1)
 logic_build_status=$?
 
 if [[ "$logic_build_status" -ne 0 ]]; then
     fail "logic tester builds without SDL2" "$logic_build_log"
     exit 1
 fi
-pass "logic tester builds without SDL2 (vec2.o/camera.o/scaler.o/map.o/shot.o only)"
+pass "logic tester builds without SDL2 (vec2.o/camera.o/scaler.o/stripes.o/map.o/shot.o only)"
 
 echo
 echo "Running the logic tester..."
