@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "render.h"
+#include "ground.h"
 #include "scaler.h"
 
 typedef struct s_draw_item
@@ -86,7 +87,7 @@ void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
         far_point.y = cam->pos.y;
         proj = scaler_project(cam, far_point);
         if (proj.visible && i % 2 == 0) {
-            band.y = HORIZON_Y + (int)((float)proj.size * STRIPE_Y_SCALE);
+            band.y = ground_row(&proj);
             thickness = (int)((float)proj.size * STRIPE_THICKNESS_SCALE);
             if (thickness > STRIPE_MAX_THICKNESS)
                 thickness = STRIPE_MAX_THICKNESS;

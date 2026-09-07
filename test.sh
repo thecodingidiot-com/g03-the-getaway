@@ -108,6 +108,7 @@ cat > "$WORK_DIR/test_logic.c" <<'TESTC'
 #include "shot.h"
 #include "map.h"
 #include "scaler.h"
+#include "ground.h"
 
 static int  g_pass = 0;
 static int  g_fail = 0;
@@ -281,12 +282,10 @@ int main(void)
     ** them -- which is why every obstacle looks like it stands at the
     ** same height as every other one.
     **
-    ** These constants are copied out of render.h rather than included,
-    ** because render.h pulls in SDL2 and this tester deliberately does
-    ** not link it. That is the whole reason this disagreement survived:
-    ** the numbers that decide where the ground is cannot be reached from
-    ** the only harness that runs without a display. */
-# define STRIPE_Y_SCALE_COPY 0.5f
+    ** The stripe side now comes from ground.h, which is SDL2-free on
+    ** purpose: the numbers deciding where the ground is were previously
+    ** unreachable from the only harness that runs without a display,
+    ** which is how the two answers drifted apart unnoticed. */
 
     camera_init(&cam, 0.0f, 0.0f, 0.0f);
     {
@@ -301,7 +300,7 @@ int main(void)
             probe.x = (float)d;
             probe.y = 0.0f;
             proj = scaler_project(&cam, probe);
-            stripe_row = HORIZON_Y + (int)((float)proj.size * STRIPE_Y_SCALE_COPY);
+            stripe_row = ground_row(&proj);
             billboard_base = proj.screen_y + proj.size;
             check_int("ground agrees with itself at depth 6/12/18/24",
                 billboard_base, stripe_row);
@@ -315,14 +314,14 @@ int main(void)
 TESTC
 
 logic_build_log=$(gcc -Wall -Wextra -I libtci -I . -c "$WORK_DIR/test_logic.c" -o "$WORK_DIR/test_logic.o" 2>&1 \
-    && gcc "$WORK_DIR/test_logic.o" vec2.o camera.o scaler.o map.o shot.o libtci/libtci.a -lm -o "$WORK_DIR/test_logic" 2>&1)
+    && gcc "$WORK_DIR/test_logic.o" vec2.o camera.o scaler.o ground.o map.o shot.o libtci/libtci.a -lm -o "$WORK_DIR/test_logic" 2>&1)
 logic_build_status=$?
 
 if [[ "$logic_build_status" -ne 0 ]]; then
     fail "logic tester builds without SDL2" "$logic_build_log"
     exit 1
 fi
-pass "logic tester builds without SDL2 (vec2.o/camera.o/scaler.o/map.o/shot.o only)"
+pass "logic tester builds without SDL2 (vec2.o/camera.o/scaler.o/ground.o/map.o/shot.o only)"
 
 echo
 echo "Running the logic tester..."
