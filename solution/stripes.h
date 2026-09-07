@@ -4,43 +4,52 @@
 # include "scaler.h"
 
 /*
-** The ground's moving reference marks.
+** The ground's moving reference marks: lane lines running away from the
+** viewer, converging on the vanishing point.
 **
-** These used to be thin stripes: one thin rect per marked depth, every
-** other one skipped. Measured over a full cycle of the pattern, that put
-** an average of 0.68 marks below screen row 360 -- and for 39 frames in
-** 120, none at all. The near field, the 120 pixels closest to the
-** viewer where motion is most legible, was empty most of the time. Six
-** of the seven marks in a typical frame landed in a ten-pixel smear at
-** the horizon, because 1/depth compresses everything beyond the first
-** one into the same few rows.
+** They used to be horizontal bands crossing the whole screen. Two
+** things were wrong with that. It gave no lateral cue at all -- strafing
+** left and right moved nothing, because a full-width band looks the
+** same wherever you stand. And the bands themselves were nearly all
+** horizon: 1/depth compresses everything past the first one into the
+** same few rows, so most of the pattern was a smear at eye level with
+** the near field empty.
 **
-** Bands between consecutive depths, rather than marks at them -- and
-** a shorter spacing, because bands alone still left the near field
-** empty for 39 frames in 120. Sweeping spacing against count:
-**
-**     spacing  count   near-field px   empty frames
-**         6.0     14              28             39
-**         4.0     20              35              0
-**         3.0     26              28              0
-**         2.5     32              27              0
-**         2.0     40              20              0
-**
-** 4.0 covers the most and is the first that is never empty. Shorter
-** spacings do not help: past a point the extra bands land in the same
-** compressed rows at the horizon and cost near-field coverage.
+** Lines along the direction of travel fix both. Their screen x depends
+** on where you are laterally, so strafing slides them across the view;
+** and the dashes along them move toward you, so the forward cue stays.
 **
 ** forward is (1, 0) for the whole game -- main.c steers by strafing,
-** never by rotating -- so depth along the view is just distance along
-** world x, and the phase is fmodf(pos.x, spacing).
+** never by rotating -- so depth is distance along world x and lateral
+** offset is distance along world y.
 **
-** This file owns the pattern and nothing else. Where a given depth
-** lands on screen is ground.h's question, and it had better be the
-** same answer the obstacles get -- which is exactly what went wrong
-** when the two were computed in different places.
+** Where a depth lands on screen vertically is ground.h's question, not
+** this file's. That separation is the whole point of the two units:
+** the lines and the obstacles stand on the same ground because they ask
+** the same function.
 */
-# define STRIPE_SPACING     4.0f
-# define STRIPE_COUNT       20
-float   stripes_edge_depth(float pos_x, int i);
+# define LANE_COUNT     8
+# define LANE_SPACING   3.0f
+# define DASH_LENGTH    3.0f
+# define STRIPE_NEAR    2.0f
+# define STRIPE_FAR     120.0f
+# define STRIPE_STEPS   64
+
+/* World lateral offset of lane i, centred on the road. An even count on
+** purpose: an odd one puts a lane exactly under the ship, which renders
+** as a vertical pole up the middle of the screen rather than a road
+** marking. */
+float   stripes_lane_offset(int lane);
+
+/* Screen column of a lane at this depth. Converges on WINDOW_W / 2. */
+int     stripes_screen_x(float lane_y, float cam_y, float depth);
+
+/* Depth of sample step s, spaced so near steps are short and far ones
+** long -- even steps in depth would spend most of them at the horizon. */
+float   stripes_step_depth(int step);
+
+/* Is the dash painted at this depth? The pattern is fixed in the world,
+** so the phase comes from how far along x the camera has driven. */
+int     stripes_dash_on(float pos_x, float depth);
 
 #endif

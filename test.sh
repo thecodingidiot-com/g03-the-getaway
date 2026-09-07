@@ -103,6 +103,7 @@ cp "${FIXTURES}/map1.txt" "$WORK_DIR/map1.txt"
 cat > "$WORK_DIR/test_logic.c" <<'TESTC'
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 #include "libtci.h"
 #include "vec2.h"
 #include "camera.h"
@@ -311,54 +312,71 @@ int main(void)
         }
     }
 
-    /* ── is there ever anything to see moving? ────────────────────────
+    /* ── do the lane lines lean toward the vanishing point? ───────────
     **
-    ** The heading test that used to live here was wrong, and the commit
-    ** that added it says so now. It varied cam->angle -- a state this
-    ** game never reaches, because main.c steers by strafing and never
-    ** calls camera_turn(). forward is (1, 0) for the whole run.
+    ** The ground used to be horizontal bands crossing the whole screen.
+    ** They gave no lateral cue -- strafing moved nothing, because a
+    ** full-width band looks the same wherever you stand -- and 1/depth
+    ** compressed nearly all of them into a smear at the horizon.
     **
-    ** The real complaint is measurable. The near field -- screen rows
-    ** below 360, the 120 pixels closest to the viewer -- is where motion
-    ** reads. If nothing is drawn there, nothing appears to move, however
-    ** fast the camera is travelling.
-    **
-    ** The old thin stripes put an average of 0.68 marks below row 360,
-    ** and none at all in 39 frames out of 120: six of the seven marks in
-    ** a typical frame landed in a ten-pixel smear at the horizon, because
-    ** 1/depth compresses everything past the first one into the same rows.
-    **
-    ** This walks a full cycle of the pattern and insists the near field
-    ** is never empty. */
+    ** Lane lines run along the direction of travel instead, so they
+    ** converge on the vanishing point and slide sideways as you strafe.
+    ** Three things have to hold. */
     {
-        float   px;
-        float   near_depth;
-        float   far_depth;
-        int     covered;
-        int     empty_frames;
-        int     step;
-        int     i;
+        float   lane_y;
+        int     near_x;
+        int     far_x;
+        int     centre_lanes;
+        int     lane;
 
-        empty_frames = 0;
-        step = 0;
-        while (step < 120) {
-            px = (float)step * 0.05f;
-            covered = 0;
-            i = 0;
-            while (i < STRIPE_COUNT - 1) {
-                near_depth = stripes_edge_depth(px, i);
-                far_depth = near_depth + STRIPE_SPACING;
-                if (near_depth >= NEAR_PLANE && i % 2 == 0
-                    && ground_row_at(near_depth) > 360)
-                    covered += ground_row_at(near_depth) - ground_row_at(far_depth);
-                i++;
-            }
-            if (covered == 0)
-                empty_frames++;
-            step++;
+        /* 1. every lane leans inward: farther along is nearer the middle. */
+        lane = 0;
+        while (lane < LANE_COUNT) {
+            lane_y = stripes_lane_offset(lane);
+            near_x = stripes_screen_x(lane_y, 0.0f, 4.0f);
+            far_x = stripes_screen_x(lane_y, 0.0f, 40.0f);
+            check_int("lane leans toward the centre as it recedes",
+                abs(far_x - WINDOW_W / 2) < abs(near_x - WINDOW_W / 2), 1);
+            lane++;
         }
-        check_int("the near field is never empty over a full cycle",
-            empty_frames, 0);
+
+        /* 2. no lane sits under the ship. An odd LANE_COUNT puts one
+        **    exactly at screen centre, which draws as a vertical pole. */
+        centre_lanes = 0;
+        lane = 0;
+        while (lane < LANE_COUNT) {
+            if (stripes_lane_offset(lane) == 0.0f)
+                centre_lanes++;
+            lane++;
+        }
+        check_int("no lane runs straight up the middle", centre_lanes, 0);
+
+        /* 3. strafing moves them. This is the cue the bands never gave. */
+        check_int("strafing slides the lanes across the view",
+            stripes_screen_x(3.0f, 0.0f, 10.0f)
+                != stripes_screen_x(3.0f, 1.0f, 10.0f), 1);
+    }
+
+    /* ── does a shot leave the ship? ───────────────────────────────────
+    **
+    ** The ship is a screen-space sprite and is never projected, so a
+    ** shot that gets stood on the ground disagrees with it -- it drops
+    ** to the floor while the ship sits at the top of the screen. A shot
+    ** starts at the ship and ends at the vanishing point. */
+    {
+        int ship_row;
+
+        ship_row = 400;
+        check_int("a shot starts at the ship",
+            ground_shot_row(NEAR_PLANE, ship_row), ship_row);
+        check_int("a shot ends at the vanishing point",
+            ground_shot_row(10000.0f, ship_row), HORIZON_Y);
+        check_int("a shot climbs toward the horizon as it travels",
+            ground_shot_row(20.0f, ship_row)
+                < ground_shot_row(4.0f, ship_row), 1);
+        /* and it follows the ship up when the ship climbs. */
+        check_int("a shot fired from a higher ship starts higher",
+            ground_shot_row(NEAR_PLANE, 300) < ground_shot_row(NEAR_PLANE, 400), 1);
     }
 
     tci_printf("\n%d passed, %d failed\n", g_pass, g_fail);
