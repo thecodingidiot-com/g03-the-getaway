@@ -33,12 +33,14 @@
 ** forward is (1, 0) for the whole game -- main.c steers by strafing,
 ** never by rotating -- so depth along the view is just distance along
 ** world x, and the phase is fmodf(pos.x, spacing).
+**
+** This file owns the pattern and nothing else. Where a given depth
+** lands on screen is ground.h's question, and it had better be the
+** same answer the obstacles get -- which is exactly what went wrong
+** when the two were computed in different places.
 */
 # define STRIPE_SPACING     4.0f
 # define STRIPE_COUNT       20
-# define STRIPE_Y_SCALE     0.5f
-
 float   stripes_edge_depth(float pos_x, int i);
-int     stripes_row(float depth);
 
 #endif

@@ -109,6 +109,7 @@ cat > "$WORK_DIR/test_logic.c" <<'TESTC'
 #include "shot.h"
 #include "map.h"
 #include "scaler.h"
+#include "ground.h"
 #include "stripes.h"
 
 static int  g_pass = 0;
@@ -269,6 +270,47 @@ int main(void)
         map_check_finish(&map, &cam), EVENT_WON);
 
 
+    /* ── where is the ground? ─────────────────────────────────────────────
+    **
+    ** Two places in this program answer that, and they do not agree.
+    **
+    ** render_ground_stripes() puts a stripe at depth d at
+    **     HORIZON_Y + size * STRIPE_Y_SCALE
+    ** so the ground descends from the horizon as things get closer.
+    **
+    ** scaler_project() puts a billboard's TOP at HORIZON_Y - size, which
+    ** puts its BOTTOM at HORIZON_Y exactly, whatever the depth. Objects
+    ** are nailed to the horizon line while the ground slides down past
+    ** them -- which is why every obstacle looks like it stands at the
+    ** same height as every other one.
+    **
+    ** The stripe side now comes from ground.h, which is SDL2-free on
+    ** purpose: the numbers deciding where the ground is were previously
+    ** unreachable from the only harness that runs without a display,
+    ** which is how the two answers drifted apart unnoticed. */
+
+    camera_init(&cam, 0.0f, 0.0f, 0.0f);
+    {
+        t_vec2          probe;
+        t_projection    proj;
+        int             stripe_row;
+        int             billboard_base;
+        int             d;
+
+        d = 6;
+        while (d <= 24) {
+            probe.x = (float)d;
+            probe.y = 0.0f;
+            proj = scaler_project(&cam, probe);
+            ground_place(&proj);
+            stripe_row = ground_row(&proj);
+            billboard_base = proj.screen_y + proj.size;
+            check_int("an obstacle stands on the ground, not on the horizon",
+                billboard_base, stripe_row);
+            d += 6;
+        }
+    }
+
     /* ── is there ever anything to see moving? ────────────────────────
     **
     ** The heading test that used to live here was wrong, and the commit
@@ -307,8 +349,8 @@ int main(void)
                 near_depth = stripes_edge_depth(px, i);
                 far_depth = near_depth + STRIPE_SPACING;
                 if (near_depth >= NEAR_PLANE && i % 2 == 0
-                    && stripes_row(near_depth) > 360)
-                    covered += stripes_row(near_depth) - stripes_row(far_depth);
+                    && ground_row_at(near_depth) > 360)
+                    covered += ground_row_at(near_depth) - ground_row_at(far_depth);
                 i++;
             }
             if (covered == 0)
@@ -325,14 +367,14 @@ int main(void)
 TESTC
 
 logic_build_log=$(gcc -Wall -Wextra -I libtci -I . -c "$WORK_DIR/test_logic.c" -o "$WORK_DIR/test_logic.o" 2>&1 \
-    && gcc "$WORK_DIR/test_logic.o" vec2.o camera.o scaler.o stripes.o map.o shot.o libtci/libtci.a -lm -o "$WORK_DIR/test_logic" 2>&1)
+    && gcc "$WORK_DIR/test_logic.o" vec2.o camera.o scaler.o ground.o stripes.o map.o shot.o libtci/libtci.a -lm -o "$WORK_DIR/test_logic" 2>&1)
 logic_build_status=$?
 
 if [[ "$logic_build_status" -ne 0 ]]; then
     fail "logic tester builds without SDL2" "$logic_build_log"
     exit 1
 fi
-pass "logic tester builds without SDL2 (vec2.o/camera.o/scaler.o/stripes.o/map.o/shot.o only)"
+pass "logic tester builds without SDL2 (vec2.o/camera.o/scaler.o/ground.o/stripes.o/map.o/shot.o only)"
 
 echo
 echo "Running the logic tester..."

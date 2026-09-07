@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "render.h"
+#include "ground.h"
 #include "stripes.h"
 #include "scaler.h"
 
@@ -82,8 +83,8 @@ void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
         near_depth = stripes_edge_depth(cam->pos.x, i);
         far_depth = near_depth + STRIPE_SPACING;
         if (near_depth >= NEAR_PLANE && i % 2 == 0) {
-            y_near = stripes_row(near_depth);
-            y_far = stripes_row(far_depth);
+            y_near = ground_row_at(near_depth);
+            y_far = ground_row_at(far_depth);
             if (y_near > WINDOW_H)
                 y_near = WINDOW_H;
             if (y_near > y_far) {
@@ -110,7 +111,7 @@ static void cap_projection(t_projection *proj)
 {
     if (proj->size > MAX_SPRITE_SIZE) {
         proj->size = MAX_SPRITE_SIZE;
-        proj->screen_y = HORIZON_Y - proj->size;
+        ground_place(proj);
     }
 }
 
@@ -148,6 +149,7 @@ void    render_map(t_map const *map, t_camera const *cam,
             items[visible].sprite_id = map->obstacles[i].sprite_id;
             items[visible].flashing = map->obstacles[i].destroyed;
             if (items[visible].proj.visible) {
+                ground_place(&items[visible].proj);
                 cap_projection(&items[visible].proj);
                 apply_height_shift(&items[visible].proj, cam_height);
                 visible++;
@@ -189,6 +191,7 @@ void    render_markers(t_camera const *cam, float cam_height,
     while (i < MARKER_COUNT) {
         items[visible].proj = scaler_project(cam, g_markers[i]);
         if (items[visible].proj.visible) {
+            ground_place(&items[visible].proj);
             cap_projection(&items[visible].proj);
             apply_height_shift(&items[visible].proj, cam_height);
             visible++;
@@ -229,6 +232,7 @@ void    render_shots(t_shot const shots[MAX_SHOTS], t_camera const *cam,
         if (shots[i].active) {
             items[visible].proj = scaler_project(cam, shots[i].pos);
             if (items[visible].proj.visible) {
+                ground_place(&items[visible].proj);
                 cap_projection(&items[visible].proj);
                 visible++;
             }
