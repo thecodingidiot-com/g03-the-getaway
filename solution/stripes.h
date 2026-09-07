@@ -15,17 +15,27 @@
 ** the horizon, because 1/depth compresses everything beyond the first
 ** one into the same few rows.
 **
-** First step: filled bands between consecutive depths, rather than
-** marks at them. The spacing is unchanged for now, so this is a
-** restructure and nothing else -- and the near-field test still fails,
-** which is the useful part. Bands alone were not the answer.
+** Bands between consecutive depths, rather than marks at them -- and
+** a shorter spacing, because bands alone still left the near field
+** empty for 39 frames in 120. Sweeping spacing against count:
+**
+**     spacing  count   near-field px   empty frames
+**         6.0     14              28             39
+**         4.0     20              35              0
+**         3.0     26              28              0
+**         2.5     32              27              0
+**         2.0     40              20              0
+**
+** 4.0 covers the most and is the first that is never empty. Shorter
+** spacings do not help: past a point the extra bands land in the same
+** compressed rows at the horizon and cost near-field coverage.
 **
 ** forward is (1, 0) for the whole game -- main.c steers by strafing,
 ** never by rotating -- so depth along the view is just distance along
 ** world x, and the phase is fmodf(pos.x, spacing).
 */
-# define STRIPE_SPACING     6.0f
-# define STRIPE_COUNT       14
+# define STRIPE_SPACING     4.0f
+# define STRIPE_COUNT       20
 # define STRIPE_Y_SCALE     0.5f
 
 float   stripes_edge_depth(float pos_x, int i);
