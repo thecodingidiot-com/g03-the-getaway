@@ -102,11 +102,13 @@ cp "${FIXTURES}/map1.txt" "$WORK_DIR/map1.txt"
 
 cat > "$WORK_DIR/test_logic.c" <<'TESTC'
 #include <stdio.h>
+#include <math.h>
 #include "libtci.h"
 #include "vec2.h"
 #include "camera.h"
 #include "shot.h"
 #include "map.h"
+#include "scaler.h"
 
 static int  g_pass = 0;
 static int  g_fail = 0;
@@ -264,6 +266,46 @@ int main(void)
     camera_init(&cam, 800.0f, 0.0f, 0.0f);
     check_int("past the finish line is still a win",
         map_check_finish(&map, &cam), EVENT_WON);
+
+
+    /* ── does the ground move at the speed you are moving? ─────────────────
+    **
+    ** render_ground_stripes() builds its stripes as a comb along world x:
+    **
+    **     far_point.x = pos.x + SPACING - fmodf(pos.x, SPACING) + i * SPACING
+    **     far_point.y = pos.y
+    **
+    ** but the camera steers -- forward is cos/sin of cam->angle -- and the
+    ** projection measures depth along forward. So every stripe's depth is
+    ** its world spacing times cos(angle). Steer, and the ground appears to
+    ** rush at you faster, because the stripes have moved closer. Apparent
+    ** speed tracks your steering instead of your speed.
+    **
+    ** The nearest stripe should sit one STRIPE_SPACING ahead whatever way
+    ** the car is pointed. */
+# define SPACING_COPY 6.0f
+
+    {
+        float   headings[3];
+        t_vec2  far_point;
+        t_projection proj;
+        int     h;
+
+        headings[0] = 0.0f;
+        headings[1] = 0.6f;
+        headings[2] = 1.0f;
+        h = 0;
+        while (h < 3) {
+            camera_init(&cam, 0.0f, 0.0f, headings[h]);
+            far_point.x = cam.pos.x + SPACING_COPY
+                - fmodf(cam.pos.x, SPACING_COPY);
+            far_point.y = cam.pos.y;
+            proj = scaler_project(&cam, far_point);
+            check_int("the nearest stripe is one spacing ahead at any heading",
+                (int)(proj.depth + 0.5f), (int)SPACING_COPY);
+            h++;
+        }
+    }
 
     tci_printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return (g_fail > 0);
