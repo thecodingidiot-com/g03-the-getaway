@@ -16,7 +16,6 @@
 # define SHOT_SCALE         0.2f
 # define STRIPE_SPACING     6.0f
 # define STRIPE_COUNT       14
-# define STRIPE_Y_SCALE     0.5f
 # define STRIPE_THICKNESS_SCALE 0.05f
 # define STRIPE_MAX_THICKNESS   36
 
