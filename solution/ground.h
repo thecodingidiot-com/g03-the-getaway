@@ -24,4 +24,13 @@
 
 int     ground_row(t_projection const *proj);
 
+/*
+** Stand a projected billboard on that ground: its base lands on
+** ground_row(), not on the horizon. scaler_project() cannot do this --
+** it is shared, byte for byte, with r01 and g04, neither of which has a
+** ground -- so the placement happens here, on this side of the call,
+** and stays testable without a display.
+*/
+void    ground_place(t_projection *proj);
+
 #endif

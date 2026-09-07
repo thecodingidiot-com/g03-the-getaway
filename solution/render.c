@@ -117,7 +117,7 @@ static void cap_projection(t_projection *proj)
 {
     if (proj->size > MAX_SPRITE_SIZE) {
         proj->size = MAX_SPRITE_SIZE;
-        proj->screen_y = HORIZON_Y - proj->size;
+        ground_place(proj);
     }
 }
 
@@ -155,6 +155,7 @@ void    render_map(t_map const *map, t_camera const *cam,
             items[visible].sprite_id = map->obstacles[i].sprite_id;
             items[visible].flashing = map->obstacles[i].destroyed;
             if (items[visible].proj.visible) {
+                ground_place(&items[visible].proj);
                 cap_projection(&items[visible].proj);
                 apply_height_shift(&items[visible].proj, cam_height);
                 visible++;
@@ -196,6 +197,7 @@ void    render_markers(t_camera const *cam, float cam_height,
     while (i < MARKER_COUNT) {
         items[visible].proj = scaler_project(cam, g_markers[i]);
         if (items[visible].proj.visible) {
+            ground_place(&items[visible].proj);
             cap_projection(&items[visible].proj);
             apply_height_shift(&items[visible].proj, cam_height);
             visible++;
@@ -236,6 +238,7 @@ void    render_shots(t_shot const shots[MAX_SHOTS], t_camera const *cam,
         if (shots[i].active) {
             items[visible].proj = scaler_project(cam, shots[i].pos);
             if (items[visible].proj.visible) {
+                ground_place(&items[visible].proj);
                 cap_projection(&items[visible].proj);
                 visible++;
             }

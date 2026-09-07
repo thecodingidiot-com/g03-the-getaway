@@ -300,9 +300,10 @@ int main(void)
             probe.x = (float)d;
             probe.y = 0.0f;
             proj = scaler_project(&cam, probe);
+            ground_place(&proj);
             stripe_row = ground_row(&proj);
             billboard_base = proj.screen_y + proj.size;
-            check_int("ground agrees with itself at depth 6/12/18/24",
+            check_int("an obstacle stands on the ground, not on the horizon",
                 billboard_base, stripe_row);
             d += 6;
         }
