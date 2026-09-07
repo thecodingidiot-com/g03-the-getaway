@@ -107,6 +107,7 @@ cat > "$WORK_DIR/test_logic.c" <<'TESTC'
 #include "camera.h"
 #include "shot.h"
 #include "map.h"
+#include "scaler.h"
 
 static int  g_pass = 0;
 static int  g_fail = 0;
@@ -264,6 +265,49 @@ int main(void)
     camera_init(&cam, 800.0f, 0.0f, 0.0f);
     check_int("past the finish line is still a win",
         map_check_finish(&map, &cam), EVENT_WON);
+
+
+    /* ── where is the ground? ─────────────────────────────────────────────
+    **
+    ** Two places in this program answer that, and they do not agree.
+    **
+    ** render_ground_stripes() puts a stripe at depth d at
+    **     HORIZON_Y + size * STRIPE_Y_SCALE
+    ** so the ground descends from the horizon as things get closer.
+    **
+    ** scaler_project() puts a billboard's TOP at HORIZON_Y - size, which
+    ** puts its BOTTOM at HORIZON_Y exactly, whatever the depth. Objects
+    ** are nailed to the horizon line while the ground slides down past
+    ** them -- which is why every obstacle looks like it stands at the
+    ** same height as every other one.
+    **
+    ** These constants are copied out of render.h rather than included,
+    ** because render.h pulls in SDL2 and this tester deliberately does
+    ** not link it. That is the whole reason this disagreement survived:
+    ** the numbers that decide where the ground is cannot be reached from
+    ** the only harness that runs without a display. */
+# define STRIPE_Y_SCALE_COPY 0.5f
+
+    camera_init(&cam, 0.0f, 0.0f, 0.0f);
+    {
+        t_vec2          probe;
+        t_projection    proj;
+        int             stripe_row;
+        int             billboard_base;
+        int             d;
+
+        d = 6;
+        while (d <= 24) {
+            probe.x = (float)d;
+            probe.y = 0.0f;
+            proj = scaler_project(&cam, probe);
+            stripe_row = HORIZON_Y + (int)((float)proj.size * STRIPE_Y_SCALE_COPY);
+            billboard_base = proj.screen_y + proj.size;
+            check_int("ground agrees with itself at depth 6/12/18/24",
+                billboard_base, stripe_row);
+            d += 6;
+        }
+    }
 
     tci_printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return (g_fail > 0);
