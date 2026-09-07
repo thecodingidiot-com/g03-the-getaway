@@ -61,41 +61,53 @@ void    render_backdrop(SDL_Renderer *ren)
 
 /* Space Harrier's own real floor is a moving scanline surface -- a
 ** different, larger technique this chapter still doesn't attempt.
-** This fills the ground with alternating bands instead: one filled rect
-** between consecutive marked depths, every other one left as bare
-** ground. stripes.h has the measurements that chose the spacing.
+** These are lane lines instead: world-space lines along the direction
+** of travel, sampled at a run of depths and joined up, so they lean in
+** toward the vanishing point the way road markings do.
 **
-** The band's far edge is the row for depth i, its near edge the row for
-** depth i+1; both come from stripes_row(), so the whole pattern sits on
-** one definition of where the ground is. */
+** Every sample asks ground_row_at() for its row, so the lines and the
+** obstacles stand on one ground. Thickness comes from the same
+** WINDOW_H / depth as everything else, which is what stops a near line
+** looking like a far one.
+*/
 void    render_ground_stripes(t_camera const *cam, SDL_Renderer *ren)
 {
-    SDL_Rect    band;
-    float       near_depth;
-    float       far_depth;
-    int         y_near;
-    int         y_far;
-    int         i;
+    float   lane_y;
+    float   d0;
+    float   d1;
+    int     x0;
+    int     x1;
+    int     thickness;
+    int     lane;
+    int     step;
+    int     t;
 
     SDL_SetRenderDrawColor(ren, 0x7c, 0x3a, 0xed, 0xff);
-    i = 0;
-    while (i < STRIPE_COUNT - 1) {
-        near_depth = stripes_edge_depth(cam->pos.x, i);
-        far_depth = near_depth + STRIPE_SPACING;
-        if (near_depth >= NEAR_PLANE && i % 2 == 0) {
-            y_near = ground_row_at(near_depth);
-            y_far = ground_row_at(far_depth);
-            if (y_near > WINDOW_H)
-                y_near = WINDOW_H;
-            if (y_near > y_far) {
-                band.x = 0;
-                band.y = y_far;
-                band.w = WINDOW_W;
-                band.h = y_near - y_far;
-                SDL_RenderFillRect(ren, &band);
+    lane = 0;
+    while (lane < LANE_COUNT) {
+        lane_y = stripes_lane_offset(lane);
+        step = 0;
+        while (step < STRIPE_STEPS) {
+            d0 = stripes_step_depth(step);
+            d1 = stripes_step_depth(step + 1);
+            if (stripes_dash_on(cam->pos.x, d0)) {
+                x0 = stripes_screen_x(lane_y, cam->pos.y, d0);
+                x1 = stripes_screen_x(lane_y, cam->pos.y, d1);
+                thickness = (int)((float)WINDOW_H / d0 / 40.0f);
+                if (thickness < 1)
+                    thickness = 1;
+                if (thickness > 6)
+                    thickness = 6;
+                t = 0;
+                while (t < thickness) {
+                    SDL_RenderDrawLine(ren, x0 + t, ground_row_at(d0),
+                        x1 + t, ground_row_at(d1));
+                    t++;
+                }
             }
+            step++;
         }
-        i++;
+        lane++;
     }
 }
 
@@ -218,7 +230,7 @@ void    render_markers(t_camera const *cam, float cam_height,
 ** obstacle should draw in front of it, same as any other object at
 ** that depth. */
 void    render_shots(t_shot const shots[MAX_SHOTS], t_camera const *cam,
-        SDL_Renderer *ren, SDL_Texture *shot_tex)
+        float cam_height, SDL_Renderer *ren, SDL_Texture *shot_tex)
 {
     t_draw_item items[MAX_SHOTS];
     int         visible;
@@ -232,8 +244,11 @@ void    render_shots(t_shot const shots[MAX_SHOTS], t_camera const *cam,
         if (shots[i].active) {
             items[visible].proj = scaler_project(cam, shots[i].pos);
             if (items[visible].proj.visible) {
-                ground_place(&items[visible].proj);
                 cap_projection(&items[visible].proj);
+                items[visible].proj.screen_y = ground_shot_row(
+                    items[visible].proj.depth,
+                    render_ship_row(cam_height))
+                    - items[visible].proj.size;
                 visible++;
             }
         }
@@ -260,6 +275,15 @@ void    render_shots(t_shot const shots[MAX_SHOTS], t_camera const *cam,
 ** instead of `SDL_RenderCopy()`, rotating the same texture around its
 ** own centre rather than moving it, the way a plane banks into a turn
 ** instead of sliding sideways rigid. */
+/* The ship is a screen-space sprite -- centre-bottom, rising with
+** cam_height -- never projected. Shots have to agree with it, so where
+** its nose sits is a fact both need and neither should guess. */
+int     render_ship_row(float cam_height)
+{
+    return (WINDOW_H - PLAYER_SPRITE_H - 24
+        - (int)(cam_height * PLAYER_PX_PER_UNIT));
+}
+
 void    render_player(SDL_Renderer *ren, SDL_Texture *player_tex,
         float cam_height, float tilt)
 {
@@ -268,7 +292,7 @@ void    render_player(SDL_Renderer *ren, SDL_Texture *player_tex,
     dst.w = PLAYER_SPRITE_W;
     dst.h = PLAYER_SPRITE_H;
     dst.x = WINDOW_W / 2 - dst.w / 2;
-    dst.y = WINDOW_H - dst.h - 24 - (int)(cam_height * PLAYER_PX_PER_UNIT);
+    dst.y = render_ship_row(cam_height);
     SDL_RenderCopyEx(ren, player_tex, NULL, &dst, (double)tilt, NULL,
         SDL_FLIP_NONE);
 }

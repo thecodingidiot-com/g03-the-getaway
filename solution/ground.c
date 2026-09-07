@@ -30,3 +30,11 @@ void    ground_place(t_projection *proj)
 {
     proj->screen_y = ground_row(proj) - proj->size;
 }
+
+int     ground_shot_row(float depth, int ship_row)
+{
+    if (depth < NEAR_PLANE)
+        depth = NEAR_PLANE;
+    return (HORIZON_Y + (int)((float)(ship_row - HORIZON_Y)
+        * (NEAR_PLANE / depth)));
+}
