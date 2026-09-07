@@ -266,7 +266,7 @@ int main(int argc, char **argv)
         render_ground_stripes(&cam, ren);
         render_markers(&cam, cam_height, ren, marker_tex);
         render_map(&map, &cam, cam_height, ren, sprites);
-        render_shots(shots, &cam, ren, shot_tex);
+        render_shots(shots, &cam, cam_height, ren, shot_tex);
         render_player(ren, player_tex, cam_height, tilt);
         render_hud(ren, font, lives, elapsed_seconds);
         if (game_over)

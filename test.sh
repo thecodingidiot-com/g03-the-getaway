@@ -102,6 +102,8 @@ cp "${FIXTURES}/map1.txt" "$WORK_DIR/map1.txt"
 
 cat > "$WORK_DIR/test_logic.c" <<'TESTC'
 #include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
 #include "libtci.h"
 #include "vec2.h"
 #include "camera.h"
@@ -109,6 +111,7 @@ cat > "$WORK_DIR/test_logic.c" <<'TESTC'
 #include "map.h"
 #include "scaler.h"
 #include "ground.h"
+#include "stripes.h"
 
 static int  g_pass = 0;
 static int  g_fail = 0;
@@ -309,20 +312,87 @@ int main(void)
         }
     }
 
+    /* ── do the lane lines lean toward the vanishing point? ───────────
+    **
+    ** The ground used to be horizontal bands crossing the whole screen.
+    ** They gave no lateral cue -- strafing moved nothing, because a
+    ** full-width band looks the same wherever you stand -- and 1/depth
+    ** compressed nearly all of them into a smear at the horizon.
+    **
+    ** Lane lines run along the direction of travel instead, so they
+    ** converge on the vanishing point and slide sideways as you strafe.
+    ** Three things have to hold. */
+    {
+        float   lane_y;
+        int     near_x;
+        int     far_x;
+        int     centre_lanes;
+        int     lane;
+
+        /* 1. every lane leans inward: farther along is nearer the middle. */
+        lane = 0;
+        while (lane < LANE_COUNT) {
+            lane_y = stripes_lane_offset(lane);
+            near_x = stripes_screen_x(lane_y, 0.0f, 4.0f);
+            far_x = stripes_screen_x(lane_y, 0.0f, 40.0f);
+            check_int("lane leans toward the centre as it recedes",
+                abs(far_x - WINDOW_W / 2) < abs(near_x - WINDOW_W / 2), 1);
+            lane++;
+        }
+
+        /* 2. no lane sits under the ship. An odd LANE_COUNT puts one
+        **    exactly at screen centre, which draws as a vertical pole. */
+        centre_lanes = 0;
+        lane = 0;
+        while (lane < LANE_COUNT) {
+            if (stripes_lane_offset(lane) == 0.0f)
+                centre_lanes++;
+            lane++;
+        }
+        check_int("no lane runs straight up the middle", centre_lanes, 0);
+
+        /* 3. strafing moves them. This is the cue the bands never gave. */
+        check_int("strafing slides the lanes across the view",
+            stripes_screen_x(3.0f, 0.0f, 10.0f)
+                != stripes_screen_x(3.0f, 1.0f, 10.0f), 1);
+    }
+
+    /* ── does a shot leave the ship? ───────────────────────────────────
+    **
+    ** The ship is a screen-space sprite and is never projected, so a
+    ** shot that gets stood on the ground disagrees with it -- it drops
+    ** to the floor while the ship sits at the top of the screen. A shot
+    ** starts at the ship and ends at the vanishing point. */
+    {
+        int ship_row;
+
+        ship_row = 400;
+        check_int("a shot starts at the ship",
+            ground_shot_row(NEAR_PLANE, ship_row), ship_row);
+        check_int("a shot ends at the vanishing point",
+            ground_shot_row(10000.0f, ship_row), HORIZON_Y);
+        check_int("a shot climbs toward the horizon as it travels",
+            ground_shot_row(20.0f, ship_row)
+                < ground_shot_row(4.0f, ship_row), 1);
+        /* and it follows the ship up when the ship climbs. */
+        check_int("a shot fired from a higher ship starts higher",
+            ground_shot_row(NEAR_PLANE, 300) < ground_shot_row(NEAR_PLANE, 400), 1);
+    }
+
     tci_printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return (g_fail > 0);
 }
 TESTC
 
 logic_build_log=$(gcc -Wall -Wextra -I libtci -I . -c "$WORK_DIR/test_logic.c" -o "$WORK_DIR/test_logic.o" 2>&1 \
-    && gcc "$WORK_DIR/test_logic.o" vec2.o camera.o scaler.o ground.o map.o shot.o libtci/libtci.a -lm -o "$WORK_DIR/test_logic" 2>&1)
+    && gcc "$WORK_DIR/test_logic.o" vec2.o camera.o scaler.o ground.o stripes.o map.o shot.o libtci/libtci.a -lm -o "$WORK_DIR/test_logic" 2>&1)
 logic_build_status=$?
 
 if [[ "$logic_build_status" -ne 0 ]]; then
     fail "logic tester builds without SDL2" "$logic_build_log"
     exit 1
 fi
-pass "logic tester builds without SDL2 (vec2.o/camera.o/scaler.o/ground.o/map.o/shot.o only)"
+pass "logic tester builds without SDL2 (vec2.o/camera.o/scaler.o/ground.o/stripes.o/map.o/shot.o only)"
 
 echo
 echo "Running the logic tester..."
